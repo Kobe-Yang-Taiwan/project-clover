@@ -1,0 +1,416 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+import 'models/offer.dart';
+import 'models/offer_store.dart';
+import 'theme.dart';
+import 'widgets/offer_card.dart';
+
+void main() => runApp(const CloverApp());
+
+class CloverApp extends StatefulWidget {
+  const CloverApp({super.key, this.store});
+
+  final OfferStore? store;
+
+  @override
+  State<CloverApp> createState() => _CloverAppState();
+}
+
+class _CloverAppState extends State<CloverApp> {
+  late final OfferStore store = widget.store ?? OfferStore();
+
+  @override
+  void dispose() {
+    if (widget.store == null) store.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Project Clover',
+      debugShowCheckedModeBanner: false,
+      theme: buildCloverTheme(),
+      locale: const Locale('zh', 'TW'),
+      supportedLocales: const [Locale('zh', 'TW')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: CloverHome(store: store),
+    );
+  }
+}
+
+class CloverHome extends StatefulWidget {
+  const CloverHome({required this.store, super.key});
+
+  final OfferStore store;
+
+  @override
+  State<CloverHome> createState() => _CloverHomeState();
+}
+
+class _CloverHomeState extends State<CloverHome> {
+  int currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.store,
+      builder: (context, _) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(currentIndex == 0 ? '今天值得使用' : '我的優惠'),
+          ),
+          body: currentIndex == 0
+              ? TodayScreen(store: widget.store)
+              : OfferListScreen(store: widget.store),
+          floatingActionButton: FloatingActionButton.extended(
+            key: const Key('add-offer-button'),
+            onPressed: () => _openAddOffer(context),
+            icon: const Icon(Icons.add),
+            label: const Text('新增優惠'),
+          ),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: currentIndex,
+            onDestinationSelected: (index) => setState(() => currentIndex = index),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.today_outlined),
+                selectedIcon: Icon(Icons.today),
+                label: '今日',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.confirmation_number_outlined),
+                selectedIcon: Icon(Icons.confirmation_number),
+                label: '優惠清單',
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openAddOffer(BuildContext context) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => AddOfferScreen(store: widget.store)),
+    );
+  }
+}
+
+class TodayScreen extends StatelessWidget {
+  const TodayScreen({required this.store, super.key});
+
+  final OfferStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final offers = store.activeOffers;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 104),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('先用快到期的', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text(
+                '未來 7 天有 ${store.expiringWithinDays(7)} 張優惠即將到期',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text('依到期日排序', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        if (offers.isEmpty)
+          const _EmptyState(message: '目前沒有待使用的優惠')
+        else
+          ...offers.map(
+            (offer) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: OfferCard(
+                offer: offer,
+                onTap: () => _openDetails(context, offer),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _openDetails(BuildContext context, Offer offer) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => OfferDetailsScreen(store: store, offerId: offer.id),
+      ),
+    );
+  }
+}
+
+class OfferListScreen extends StatelessWidget {
+  const OfferListScreen({required this.store, super.key});
+
+  final OfferStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = store.activeOffers;
+    final completed = store.completedOffers;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 104),
+      children: [
+        Text('待使用（${active.length}）', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        ...active.map(
+          (offer) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: OfferCard(
+              offer: offer,
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => OfferDetailsScreen(store: store, offerId: offer.id),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text('已完成（${completed.length}）', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        if (completed.isEmpty)
+          const _EmptyState(message: '完成優惠後會顯示在這裡')
+        else
+          ...completed.map(
+            (offer) => ListTile(
+              leading: const Icon(Icons.check_circle, color: Color(0xFF2E7D5B)),
+              title: Text(offer.name),
+              subtitle: Text('到期日 ${formatTaiwanDate(offer.expiresAt)}'),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class AddOfferScreen extends StatefulWidget {
+  const AddOfferScreen({required this.store, super.key});
+
+  final OfferStore store;
+
+  @override
+  State<AddOfferScreen> createState() => _AddOfferScreenState();
+}
+
+class _AddOfferScreenState extends State<AddOfferScreen> {
+  final formKey = GlobalKey<FormState>();
+  final nameController = TextEditingController();
+  final sourceController = TextEditingController();
+  final noteController = TextEditingController();
+  DateTime? expiresAt;
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    sourceController.dispose();
+    noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('新增優惠')),
+      body: Form(
+        key: formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextFormField(
+              key: const Key('offer-name-field'),
+              controller: nameController,
+              decoration: const InputDecoration(labelText: '優惠名稱 *'),
+              validator: (value) => value == null || value.trim().isEmpty ? '請輸入優惠名稱' : null,
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              key: const Key('expiry-date-field'),
+              onTap: _selectDate,
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: '到期日 *',
+                  errorText: expiresAt == null && attemptedSubmit ? '請選擇到期日' : null,
+                ),
+                child: Text(expiresAt == null ? '選擇日期' : formatTaiwanDate(expiresAt!)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: sourceController,
+              decoration: const InputDecoration(labelText: '來源／品牌（選填）'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: noteController,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: '備註（選填）'),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              key: const Key('save-offer-button'),
+              onPressed: _save,
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('儲存優惠'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool attemptedSubmit = false;
+
+  Future<void> _selectDate() async {
+    final now = DateTime.now();
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: expiresAt ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 5),
+      locale: const Locale('zh', 'TW'),
+    );
+    if (selected != null) setState(() => expiresAt = selected);
+  }
+
+  void _save() {
+    setState(() => attemptedSubmit = true);
+    if (!(formKey.currentState?.validate() ?? false) || expiresAt == null) return;
+    widget.store.addOffer(
+      name: nameController.text,
+      expiresAt: expiresAt!,
+      source: sourceController.text,
+      note: noteController.text,
+    );
+    Navigator.of(context).pop();
+  }
+}
+
+class OfferDetailsScreen extends StatelessWidget {
+  const OfferDetailsScreen({
+    required this.store,
+    required this.offerId,
+    super.key,
+  });
+
+  final OfferStore store;
+  final String offerId;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: store,
+      builder: (context, _) {
+        final allOffers = [...store.activeOffers, ...store.completedOffers];
+        final offer = allOffers.where((item) => item.id == offerId).firstOrNull;
+        if (offer == null) {
+          return const Scaffold(body: Center(child: Text('找不到這筆優惠')));
+        }
+        return Scaffold(
+          appBar: AppBar(title: const Text('優惠詳情')),
+          body: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Icon(
+                Icons.confirmation_number,
+                size: 64,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 20),
+              Text(offer.name, style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 24),
+              _DetailRow(label: '到期日', value: formatTaiwanDate(offer.expiresAt)),
+              if (offer.source.isNotEmpty) _DetailRow(label: '來源', value: offer.source),
+              if (offer.note.isNotEmpty) _DetailRow(label: '備註', value: offer.note),
+              const SizedBox(height: 28),
+              if (!offer.isCompleted)
+                FilledButton.icon(
+                  key: const Key('complete-offer-button'),
+                  onPressed: () {
+                    final messenger = ScaffoldMessenger.of(context);
+                    store.markCompleted(offer.id);
+                    Navigator.of(context).pop();
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('已標記完成，成功保住這份價值！')),
+                    );
+                  },
+                  icon: const Icon(Icons.check),
+                  label: const Text('標記為已使用'),
+                )
+              else
+                const Chip(
+                  avatar: Icon(Icons.check_circle),
+                  label: Text('已完成'),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 72, child: Text(label)),
+          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Column(
+        children: [
+          Icon(Icons.eco_outlined, size: 48, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 12),
+          Text(message),
+        ],
+      ),
+    );
+  }
+}
+
+extension _FirstOrNull<E> on Iterable<E> {
+  E? get firstOrNull => isEmpty ? null : first;
+}
