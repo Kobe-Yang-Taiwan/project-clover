@@ -70,6 +70,54 @@ class OfferStore extends ChangeNotifier {
     return offer;
   }
 
+  Future<void> updateOffer({
+    required String id,
+    required String name,
+    required DateTime expiresAt,
+    String source = '',
+    String note = '',
+    bool reminderEnabled = true,
+    int reminderDaysBefore = 1,
+    int reminderHour = 9,
+    int reminderMinute = 0,
+  }) async {
+    final index = _offers.indexWhere((offer) => offer.id == id);
+    if (index == -1) throw StateError('Offer not found');
+
+    final previous = _offers[index];
+    _offers[index] = previous.copyWith(
+      name: name.trim(),
+      expiresAt: expiresAt,
+      source: source.trim(),
+      note: note.trim(),
+      reminderEnabled: reminderEnabled,
+      reminderDaysBefore: normalizeReminderDays(reminderDaysBefore),
+      reminderHour: reminderHour,
+      reminderMinute: reminderMinute,
+    );
+    try {
+      await _persist();
+    } catch (_) {
+      _offers[index] = previous;
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteOffer(String id) async {
+    final index = _offers.indexWhere((offer) => offer.id == id);
+    if (index == -1) return;
+
+    final removed = _offers.removeAt(index);
+    try {
+      await _persist();
+    } catch (_) {
+      _offers.insert(index, removed);
+      rethrow;
+    }
+    notifyListeners();
+  }
+
   Future<void> markCompleted(String id) async {
     final index = _offers.indexWhere((offer) => offer.id == id);
     if (index == -1 || _offers[index].isCompleted) return;
