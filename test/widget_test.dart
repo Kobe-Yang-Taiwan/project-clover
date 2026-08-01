@@ -71,6 +71,11 @@ void main() {
       find.byKey(const Key('offer-name-field')),
       '編輯後名稱',
     );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('save-offer-button')),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.byKey(const Key('save-offer-button')));
     await tester.pumpAndSettle();
 
