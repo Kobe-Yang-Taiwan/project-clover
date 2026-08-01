@@ -1,12 +1,16 @@
 name: project_clover
 description: Android-first prototype for managing expiring everyday value.
 publish_to: none
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
-  sdk: '>=3.4.0 <4.0.0'
+  sdk: '>=3.10.0 <4.0.0'
+  flutter: '>=3.38.1'
 
 dependencies:
+  flutter_local_notifications: ^22.2.0
+  flutter_timezone: ^5.1.0
+  timezone: ^0.11.1
   flutter:
     sdk: flutter
   flutter_localizations:
