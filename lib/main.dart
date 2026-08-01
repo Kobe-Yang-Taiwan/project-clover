@@ -11,14 +11,37 @@ import 'widgets/offer_card.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final store = await OfferStore.load();
+  final navigatorKey = GlobalKey<NavigatorState>();
   OfferReminderScheduler reminders = const NoopOfferReminderScheduler();
+
+  void openOfferFromNotification(String offerId) {
+    navigatorKey.currentState?.push<void>(
+      MaterialPageRoute(
+        builder: (_) => OfferDetailsScreen(
+          store: store,
+          reminders: reminders,
+          offerId: offerId,
+        ),
+      ),
+    );
+  }
+
   try {
-    reminders = await AndroidOfferReminderScheduler.create();
+    reminders = await AndroidOfferReminderScheduler.create(
+      onOfferSelected: openOfferFromNotification,
+    );
     await reminders.sync(store.activeOffers);
   } catch (_) {
     // Notifications are optional; storage and the core app must still start.
   }
-  runApp(CloverApp(store: store, reminders: reminders));
+  runApp(
+    CloverApp(
+      store: store,
+      reminders: reminders,
+      navigatorKey: navigatorKey,
+      initialOfferId: reminders.initialOfferId,
+    ),
+  );
 }
 
 class CloverApp extends StatefulWidget {
@@ -26,10 +49,14 @@ class CloverApp extends StatefulWidget {
     super.key,
     this.store,
     this.reminders = const NoopOfferReminderScheduler(),
+    this.navigatorKey,
+    this.initialOfferId,
   });
 
   final OfferStore? store;
   final OfferReminderScheduler reminders;
+  final GlobalKey<NavigatorState>? navigatorKey;
+  final String? initialOfferId;
 
   @override
   State<CloverApp> createState() => _CloverAppState();
@@ -37,6 +64,25 @@ class CloverApp extends StatefulWidget {
 
 class _CloverAppState extends State<CloverApp> {
   late final OfferStore store = widget.store ?? OfferStore();
+
+  @override
+  void initState() {
+    super.initState();
+    final offerId = widget.initialOfferId;
+    if (offerId != null && offerId.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.navigatorKey?.currentState?.push<void>(
+          MaterialPageRoute(
+            builder: (_) => OfferDetailsScreen(
+              store: store,
+              reminders: widget.reminders,
+              offerId: offerId,
+            ),
+          ),
+        );
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -47,6 +93,7 @@ class _CloverAppState extends State<CloverApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: widget.navigatorKey,
       title: 'Project Clover',
       debugShowCheckedModeBanner: false,
       theme: buildCloverTheme(),
