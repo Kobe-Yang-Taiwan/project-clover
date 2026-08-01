@@ -24,6 +24,9 @@ jobs:
       - name: Generate Android platform files
         run: flutter create --platforms=android --org tw.projectclover --project-name project_clover --no-pub .
 
+      - name: Configure Android notifications
+        run: python3 tool/configure_android_notifications.py
+
       - name: Install dependencies
         run: flutter pub get
 
