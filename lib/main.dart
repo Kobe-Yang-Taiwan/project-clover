@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'models/offer.dart';
 import 'models/offer_store.dart';
@@ -86,6 +87,14 @@ class _CloverHomeState extends State<CloverHome> {
         return Scaffold(
           appBar: AppBar(
             title: Text(currentIndex == 0 ? '今天值得使用' : '我的優惠'),
+            actions: [
+              IconButton(
+                key: const Key('app-info-button'),
+                tooltip: '軟體資訊',
+                onPressed: () => _showAppInfo(context),
+                icon: const Icon(Icons.info_outline),
+              ),
+            ],
           ),
           body: currentIndex == 0
               ? TodayScreen(
@@ -121,6 +130,34 @@ class _CloverHomeState extends State<CloverHome> {
         );
       },
     );
+  }
+
+  Future<void> _showAppInfo(BuildContext context) async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (!context.mounted) return;
+      showAboutDialog(
+        context: context,
+        applicationName: 'Project Clover',
+        applicationVersion:
+            '版本 ${packageInfo.version}（Build ${packageInfo.buildNumber}）',
+        applicationIcon: Icon(
+          Icons.eco,
+          size: 48,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        children: const [
+          Text('協助你在到期前使用優惠，別讓已擁有的價值悄悄溜走。'),
+          SizedBox(height: 8),
+          Text('Prototype 測試版本'),
+        ],
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('目前無法讀取軟體版本')),
+      );
+    }
   }
 
   Future<void> _openAddOffer(BuildContext context) async {
