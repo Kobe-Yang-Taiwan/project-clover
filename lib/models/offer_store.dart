@@ -43,6 +43,8 @@ class OfferStore extends ChangeNotifier {
     required DateTime expiresAt,
     String source = '',
     String note = '',
+    bool reminderEnabled = true,
+    DateTime? reminderAt,
   }) async {
     final offer = Offer(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -50,6 +52,8 @@ class OfferStore extends ChangeNotifier {
       expiresAt: expiresAt,
       source: source.trim(),
       note: note.trim(),
+      reminderEnabled: reminderEnabled,
+      reminderAt: reminderAt,
     );
     _offers.add(offer);
     try {
