@@ -343,11 +343,13 @@ class AddOfferScreen extends StatefulWidget {
   const AddOfferScreen({
     required this.store,
     required this.reminders,
+    this.offer,
     super.key,
   });
 
   final OfferStore store;
   final OfferReminderScheduler reminders;
+  final Offer? offer;
 
   @override
   State<AddOfferScreen> createState() => _AddOfferScreenState();
@@ -364,6 +366,26 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
   TimeOfDay reminderTime = const TimeOfDay(hour: 9, minute: 0);
   String? reminderError;
 
+  bool get isEditing => widget.offer != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final offer = widget.offer;
+    if (offer == null) return;
+
+    nameController.text = offer.name;
+    sourceController.text = offer.source;
+    noteController.text = offer.note;
+    expiresAt = offer.expiresAt;
+    reminderEnabled = offer.reminderEnabled;
+    reminderDaysBefore = offer.reminderDaysBefore;
+    reminderTime = TimeOfDay(
+      hour: offer.reminderHour,
+      minute: offer.reminderMinute,
+    );
+  }
+
   @override
   void dispose() {
     nameController.dispose();
@@ -375,7 +397,7 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('新增優惠')),
+      appBar: AppBar(title: Text(isEditing ? '編輯優惠' : '新增優惠')),
       body: Form(
         key: formKey,
         child: ListView(
@@ -478,7 +500,13 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save_outlined),
-              label: Text(isSaving ? '儲存中…' : '儲存優惠'),
+              label: Text(
+                isSaving
+                    ? '儲存中…'
+                    : isEditing
+                        ? '儲存變更'
+                        : '儲存優惠',
+              ),
             ),
           ],
         ),
@@ -548,16 +576,31 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
       reminderError = null;
     });
     try {
-      await widget.store.addOffer(
-        name: nameController.text,
-        expiresAt: expiresAt!,
-        source: sourceController.text,
-        note: noteController.text,
-        reminderEnabled: reminderEnabled,
-        reminderDaysBefore: reminderDaysBefore,
-        reminderHour: reminderTime.hour,
-        reminderMinute: reminderTime.minute,
-      );
+      final offer = widget.offer;
+      if (offer == null) {
+        await widget.store.addOffer(
+          name: nameController.text,
+          expiresAt: expiresAt!,
+          source: sourceController.text,
+          note: noteController.text,
+          reminderEnabled: reminderEnabled,
+          reminderDaysBefore: reminderDaysBefore,
+          reminderHour: reminderTime.hour,
+          reminderMinute: reminderTime.minute,
+        );
+      } else {
+        await widget.store.updateOffer(
+          id: offer.id,
+          name: nameController.text,
+          expiresAt: expiresAt!,
+          source: sourceController.text,
+          note: noteController.text,
+          reminderEnabled: reminderEnabled,
+          reminderDaysBefore: reminderDaysBefore,
+          reminderHour: reminderTime.hour,
+          reminderMinute: reminderTime.minute,
+        );
+      }
 
       var reminderFailed = false;
       var reminderPermissionDenied = false;
@@ -586,6 +629,10 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
       } else if (reminderPermissionDenied) {
         messenger.showSnackBar(
           const SnackBar(content: Text('優惠已儲存；允許通知後才會收到提醒')),
+        );
+      } else if (isEditing) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('優惠已更新')),
         );
       }
     } catch (_) {
