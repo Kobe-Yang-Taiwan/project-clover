@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:project_clover/main.dart';
+import 'package:project_clover/models/offer.dart';
 import 'package:project_clover/models/offer_store.dart';
 
 void main() {
@@ -16,8 +17,36 @@ void main() {
     expect(find.byKey(const Key('offer-name-field')), findsOneWidget);
     expect(find.byKey(const Key('expiry-date-field')), findsOneWidget);
     expect(find.byKey(const Key('reminder-switch')), findsOneWidget);
+    expect(find.byKey(const Key('reminder-days-field')), findsOneWidget);
+    expect(find.byKey(const Key('reminder-time-field')), findsOneWidget);
     expect(find.text('到期提醒'), findsOneWidget);
-    expect(find.text('請先選擇到期日'), findsOneWidget);
+    expect(find.text('1 天前'), findsOneWidget);
+    expect(find.text('09:00'), findsOneWidget);
+  });
+
+  testWidgets('notification launch opens the matching offer details', (tester) async {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'notification-offer',
+          name: '通知點擊測試',
+          expiresAt: DateTime(2026, 8, 10),
+        ),
+      ],
+    );
+    final navigatorKey = GlobalKey<NavigatorState>();
+
+    await tester.pumpWidget(
+      CloverApp(
+        store: store,
+        navigatorKey: navigatorKey,
+        initialOfferId: 'notification-offer',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('優惠詳情'), findsOneWidget);
+    expect(find.text('通知點擊測試'), findsOneWidget);
   });
 
   testWidgets('offer can be marked completed', (tester) async {
