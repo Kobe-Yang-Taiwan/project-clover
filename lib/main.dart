@@ -275,6 +275,9 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
   final sourceController = TextEditingController();
   final noteController = TextEditingController();
   DateTime? expiresAt;
+  bool reminderEnabled = true;
+  DateTime? reminderAt;
+  String? reminderError;
 
   @override
   void dispose() {
@@ -311,6 +314,46 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
                 child: Text(expiresAt == null ? '選擇日期' : formatTaiwanDate(expiresAt!)),
               ),
             ),
+            const SizedBox(height: 12),
+            SwitchListTile.adaptive(
+              key: const Key('reminder-switch'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('到期提醒'),
+              subtitle: Text(
+                reminderEnabled
+                    ? '在指定時間發送手機通知'
+                    : '不發送這張優惠的通知',
+              ),
+              value: reminderEnabled,
+              onChanged: (value) {
+                setState(() {
+                  reminderEnabled = value;
+                  reminderError = null;
+                  if (value && reminderAt == null && expiresAt != null) {
+                    reminderAt = _defaultReminderAtFor(expiresAt!);
+                  }
+                });
+              },
+            ),
+            if (reminderEnabled) ...[
+              const SizedBox(height: 4),
+              InkWell(
+                key: const Key('reminder-date-time-field'),
+                onTap: expiresAt == null ? null : _selectReminderDateTime,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: '提醒日期與時間',
+                    helperText: expiresAt == null ? '請先選擇到期日' : null,
+                    errorText: reminderError,
+                  ),
+                  child: Text(
+                    reminderAt == null
+                        ? '選擇提醒日期與時間'
+                        : formatTaiwanDateTime(reminderAt!),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             TextField(
               controller: sourceController,
@@ -352,26 +395,108 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
       lastDate: DateTime(now.year + 5),
       locale: const Locale('zh', 'TW'),
     );
-    if (selected != null) setState(() => expiresAt = selected);
+    if (selected != null) {
+      setState(() {
+        expiresAt = selected;
+        reminderAt = _defaultReminderAtFor(selected);
+        reminderError = null;
+      });
+    }
+  }
+
+  DateTime _defaultReminderAtFor(DateTime expiry) {
+    final now = DateTime.now();
+    final preferred = DateTime(expiry.year, expiry.month, expiry.day, 9)
+        .subtract(const Duration(days: 1));
+    if (preferred.isAfter(now)) return preferred;
+
+    final soon = now.add(const Duration(minutes: 5));
+    return DateTime(soon.year, soon.month, soon.day, soon.hour, soon.minute);
+  }
+
+  Future<void> _selectReminderDateTime() async {
+    final expiry = expiresAt;
+    if (expiry == null) return;
+
+    final now = DateTime.now();
+    final initial = reminderAt ?? _defaultReminderAtFor(expiry);
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(expiry.year, expiry.month, expiry.day),
+      locale: const Locale('zh', 'TW'),
+    );
+    if (selectedDate == null || !mounted) return;
+
+    final selectedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+      helpText: '選擇提醒時間',
+    );
+    if (selectedTime == null) return;
+
+    setState(() {
+      reminderAt = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        selectedTime.hour,
+        selectedTime.minute,
+      );
+      reminderError = null;
+    });
   }
 
   Future<void> _save() async {
     setState(() => attemptedSubmit = true);
     if (!(formKey.currentState?.validate() ?? false) || expiresAt == null) return;
 
-    setState(() => isSaving = true);
+    if (reminderEnabled) {
+      final selectedReminder = reminderAt;
+      final expiryEnd = DateTime(
+        expiresAt!.year,
+        expiresAt!.month,
+        expiresAt!.day,
+        23,
+        59,
+        59,
+      );
+      if (selectedReminder == null || !selectedReminder.isAfter(DateTime.now())) {
+        setState(() => reminderError = '提醒時間必須晚於現在');
+        return;
+      }
+      if (selectedReminder.isAfter(expiryEnd)) {
+        setState(() => reminderError = '提醒時間不能晚於到期日');
+        return;
+      }
+    }
+
+    setState(() {
+      isSaving = true;
+      reminderError = null;
+    });
     try {
       await widget.store.addOffer(
         name: nameController.text,
         expiresAt: expiresAt!,
         source: sourceController.text,
         note: noteController.text,
+        reminderEnabled: reminderEnabled,
+        reminderAt: reminderEnabled ? reminderAt : null,
       );
 
       var reminderFailed = false;
+      var reminderPermissionDenied = false;
       try {
-        final granted = await widget.reminders.requestPermission();
-        if (granted) {
+        if (reminderEnabled) {
+          final granted = await widget.reminders.requestPermission();
+          if (granted) {
+            await widget.reminders.sync(widget.store.activeOffers);
+          } else {
+            reminderPermissionDenied = true;
+          }
+        } else {
           await widget.reminders.sync(widget.store.activeOffers);
         }
       } catch (_) {
@@ -384,6 +509,10 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
       if (reminderFailed) {
         messenger.showSnackBar(
           const SnackBar(content: Text('優惠已儲存，但提醒設定失敗')),
+        );
+      } else if (reminderPermissionDenied) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('優惠已儲存；允許通知後才會收到提醒')),
         );
       }
     } catch (_) {
@@ -432,6 +561,12 @@ class OfferDetailsScreen extends StatelessWidget {
               Text(offer.name, style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 24),
               _DetailRow(label: '到期日', value: formatTaiwanDate(offer.expiresAt)),
+              _DetailRow(
+                label: '提醒',
+                value: offer.reminderEnabled
+                    ? formatTaiwanDateTime(offer.effectiveReminderAt)
+                    : '已關閉',
+              ),
               if (offer.source.isNotEmpty) _DetailRow(label: '來源', value: offer.source),
               if (offer.note.isNotEmpty) _DetailRow(label: '備註', value: offer.note),
               const SizedBox(height: 28),
@@ -513,6 +648,12 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+String formatTaiwanDateTime(DateTime value) {
+  final hour = value.hour.toString().padLeft(2, '0');
+  final minute = value.minute.toString().padLeft(2, '0');
+  return '${formatTaiwanDate(value)} $hour:$minute';
 }
 
 extension _FirstOrNull<E> on Iterable<E> {
