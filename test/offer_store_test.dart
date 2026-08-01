@@ -58,6 +58,8 @@ void main() {
       expiresAt: DateTime(2026, 8, 1),
       source: '來源',
       note: '備註',
+      reminderEnabled: true,
+      reminderAt: DateTime(2026, 7, 30, 18, 30),
       status: OfferStatus.completed,
     );
 
@@ -68,6 +70,8 @@ void main() {
     expect(restored.expiresAt, original.expiresAt);
     expect(restored.source, original.source);
     expect(restored.note, original.note);
+    expect(restored.reminderEnabled, isTrue);
+    expect(restored.reminderAt, DateTime(2026, 7, 30, 18, 30));
     expect(restored.status, OfferStatus.completed);
   });
 }
