@@ -694,7 +694,14 @@ class OfferDetailsScreen extends StatelessWidget {
               if (offer.source.isNotEmpty) _DetailRow(label: '來源', value: offer.source),
               if (offer.note.isNotEmpty) _DetailRow(label: '備註', value: offer.note),
               const SizedBox(height: 28),
-              if (!offer.isCompleted)
+              if (!offer.isCompleted) ...[
+                OutlinedButton.icon(
+                  key: const Key('edit-offer-button'),
+                  onPressed: () => _editOffer(context, offer),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('編輯優惠'),
+                ),
+                const SizedBox(height: 12),
                 FilledButton.icon(
                   key: const Key('complete-offer-button'),
                   onPressed: () async {
@@ -719,8 +726,18 @@ class OfferDetailsScreen extends StatelessWidget {
                   },
                   icon: const Icon(Icons.check),
                   label: const Text('標記為已使用'),
-                )
-              else
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  key: const Key('delete-offer-button'),
+                  onPressed: () => _deleteOffer(context, offer),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('刪除優惠'),
+                ),
+              ] else
                 const Chip(
                   avatar: Icon(Icons.check_circle),
                   label: Text('已完成'),
@@ -730,6 +747,59 @@ class OfferDetailsScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _editOffer(BuildContext context, Offer offer) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AddOfferScreen(
+          store: store,
+          reminders: reminders,
+          offer: offer,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteOffer(BuildContext context, Offer offer) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('刪除這張優惠？'),
+        content: Text('「${offer.name}」刪除後無法復原。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            key: const Key('confirm-delete-offer-button'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('確認刪除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await store.deleteOffer(offer.id);
+      try {
+        await reminders.cancel(offer.id);
+      } catch (_) {
+        // Deletion is saved even if reminder cancellation fails.
+      }
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('優惠已刪除')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('刪除失敗，請稍後再試')),
+      );
+    }
   }
 }
 
