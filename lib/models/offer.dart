@@ -89,17 +89,28 @@ class Offer {
         'status': status.name,
       };
 
-  Offer copyWith({OfferStatus? status}) {
+  Offer copyWith({
+    String? name,
+    DateTime? expiresAt,
+    String? source,
+    String? note,
+    bool? reminderEnabled,
+    int? reminderDaysBefore,
+    int? reminderHour,
+    int? reminderMinute,
+    OfferStatus? status,
+  }) {
     return Offer(
       id: id,
-      name: name,
-      expiresAt: expiresAt,
-      source: source,
-      note: note,
-      reminderEnabled: reminderEnabled,
-      reminderDaysBefore: reminderDaysBefore,
-      reminderHour: reminderHour,
-      reminderMinute: reminderMinute,
+      name: name ?? this.name,
+      expiresAt: expiresAt ?? this.expiresAt,
+      source: source ?? this.source,
+      note: note ?? this.note,
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderDaysBefore:
+          reminderDaysBefore ?? this.reminderDaysBefore,
+      reminderHour: reminderHour ?? this.reminderHour,
+      reminderMinute: reminderMinute ?? this.reminderMinute,
       status: status ?? this.status,
     );
   }
