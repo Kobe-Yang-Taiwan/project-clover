@@ -391,7 +391,7 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
     final selected = await showDatePicker(
       context: context,
       initialDate: expiresAt ?? now,
-      firstDate: DateTime(now.year - 1),
+      firstDate: DateTime(now.year, now.month, now.day),
       lastDate: DateTime(now.year + 5),
       locale: const Locale('zh', 'TW'),
     );
