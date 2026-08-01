@@ -8,6 +8,7 @@ void main() {
     await tester.pumpWidget(CloverApp(store: OfferStore(initialOffers: [])));
 
     expect(find.text('今天值得使用'), findsOneWidget);
+    expect(find.byKey(const Key('app-info-button')), findsOneWidget);
     await tester.tap(find.byKey(const Key('add-offer-button')));
     await tester.pumpAndSettle();
 
