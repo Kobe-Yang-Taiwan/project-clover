@@ -1,12 +1,23 @@
 import 'package:flutter/foundation.dart';
 
 import 'offer.dart';
+import 'offer_storage.dart';
 
 class OfferStore extends ChangeNotifier {
-  OfferStore({List<Offer>? initialOffers})
-      : _offers = List<Offer>.from(initialOffers ?? _demoOffers());
+  OfferStore({
+    List<Offer>? initialOffers,
+    OfferStorage? storage,
+  })  : _offers = List<Offer>.from(initialOffers ?? _demoOffers()),
+        _storage = storage;
 
   final List<Offer> _offers;
+  final OfferStorage? _storage;
+
+  static Future<OfferStore> load({OfferStorage? storage}) async {
+    final persistence = storage ?? SharedPreferencesOfferStorage();
+    final savedOffers = await persistence.loadOffers();
+    return OfferStore(initialOffers: savedOffers, storage: persistence);
+  }
 
   List<Offer> get activeOffers {
     final offers = _offers.where((offer) => !offer.isCompleted).toList();
@@ -27,29 +38,46 @@ class OfferStore extends ChangeNotifier {
     }).length;
   }
 
-  void addOffer({
+  Future<void> addOffer({
     required String name,
     required DateTime expiresAt,
     String source = '',
     String note = '',
-  }) {
-    _offers.add(
-      Offer(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        name: name.trim(),
-        expiresAt: expiresAt,
-        source: source.trim(),
-        note: note.trim(),
-      ),
+  }) async {
+    final offer = Offer(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      name: name.trim(),
+      expiresAt: expiresAt,
+      source: source.trim(),
+      note: note.trim(),
     );
+    _offers.add(offer);
+    try {
+      await _persist();
+    } catch (_) {
+      _offers.remove(offer);
+      rethrow;
+    }
     notifyListeners();
   }
 
-  void markCompleted(String id) {
+  Future<void> markCompleted(String id) async {
     final index = _offers.indexWhere((offer) => offer.id == id);
     if (index == -1 || _offers[index].isCompleted) return;
-    _offers[index] = _offers[index].copyWith(status: OfferStatus.completed);
+
+    final previous = _offers[index];
+    _offers[index] = previous.copyWith(status: OfferStatus.completed);
+    try {
+      await _persist();
+    } catch (_) {
+      _offers[index] = previous;
+      rethrow;
+    }
     notifyListeners();
+  }
+
+  Future<void> _persist() async {
+    await _storage?.saveOffers(List<Offer>.unmodifiable(_offers));
   }
 
   static DateTime _dateOnly(DateTime value) =>
