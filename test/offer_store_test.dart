@@ -51,6 +51,61 @@ void main() {
     expect(reopenedAgain.completedOffers.single.id, savedId);
   });
 
+  test('editing an offer persists all changed fields', () async {
+    final storage = MemoryOfferStorage();
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'edit-me',
+          name: '原名稱',
+          expiresAt: DateTime(2026, 8, 10),
+        ),
+      ],
+      storage: storage,
+    );
+
+    await store.updateOffer(
+      id: 'edit-me',
+      name: '新名稱',
+      expiresAt: DateTime(2026, 8, 20),
+      source: '新來源',
+      note: '新備註',
+      reminderDaysBefore: 7,
+      reminderHour: 18,
+      reminderMinute: 30,
+    );
+    final reopened = await OfferStore.load(storage: storage);
+    final edited = reopened.activeOffers.single;
+
+    expect(edited.name, '新名稱');
+    expect(edited.expiresAt, DateTime(2026, 8, 20));
+    expect(edited.source, '新來源');
+    expect(edited.note, '新備註');
+    expect(edited.reminderDaysBefore, 7);
+    expect(edited.reminderHour, 18);
+    expect(edited.reminderMinute, 30);
+  });
+
+  test('deleting an offer persists its removal', () async {
+    final storage = MemoryOfferStorage();
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'delete-me',
+          name: '要刪除',
+          expiresAt: DateTime(2026, 8, 10),
+        ),
+      ],
+      storage: storage,
+    );
+
+    await store.deleteOffer('delete-me');
+    final reopened = await OfferStore.load(storage: storage);
+
+    expect(store.activeOffers, isEmpty);
+    expect(reopened.activeOffers, isEmpty);
+  });
+
   test('legacy custom reminder migrates to nearest preset and keeps time', () {
     final restored = Offer.fromJson({
       'id': 'legacy',
