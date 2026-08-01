@@ -71,12 +71,18 @@ void main() {
       find.byKey(const Key('offer-name-field')),
       '編輯後名稱',
     );
+    final saveButton = find.byKey(const Key('save-offer-button'));
     await tester.scrollUntilVisible(
-      find.byKey(const Key('save-offer-button')),
+      saveButton,
       300,
       scrollable: find.byType(Scrollable).last,
     );
-    await tester.tap(find.byKey(const Key('save-offer-button')));
+    await tester.drag(
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(saveButton);
     await tester.pumpAndSettle();
 
     expect(store.activeOffers.single.name, '編輯後名稱');
