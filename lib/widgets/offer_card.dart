@@ -84,3 +84,8 @@ class OfferCard extends StatelessWidget {
 
 String formatTaiwanDate(DateTime date) =>
     '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+
+String formatTaiwanDateTime(DateTime date) =>
+    '${formatTaiwanDate(date)} '
+    '${date.hour.toString().padLeft(2, '0')}:'
+    '${date.minute.toString().padLeft(2, '0')}';

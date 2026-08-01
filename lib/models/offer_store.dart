@@ -25,9 +25,20 @@ class OfferStore extends ChangeNotifier {
     return List<Offer>.unmodifiable(offers);
   }
 
-  List<Offer> get completedOffers => List<Offer>.unmodifiable(
-        _offers.where((offer) => offer.isCompleted),
-      );
+  List<Offer> get completedOffers {
+    final offers = _offers.where((offer) => offer.isCompleted).toList();
+    offers.sort((a, b) {
+      final aCompleted = a.completedAt;
+      final bCompleted = b.completedAt;
+      if (aCompleted != null && bCompleted != null) {
+        return bCompleted.compareTo(aCompleted);
+      }
+      if (aCompleted != null) return -1;
+      if (bCompleted != null) return 1;
+      return b.expiresAt.compareTo(a.expiresAt);
+    });
+    return List<Offer>.unmodifiable(offers);
+  }
 
   int expiringWithinDays(int days, {DateTime? now}) {
     final today = _dateOnly(now ?? DateTime.now());
@@ -118,12 +129,33 @@ class OfferStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> markCompleted(String id) async {
+  Future<void> markCompleted(String id, {DateTime? completedAt}) async {
     final index = _offers.indexWhere((offer) => offer.id == id);
     if (index == -1 || _offers[index].isCompleted) return;
 
     final previous = _offers[index];
-    _offers[index] = previous.copyWith(status: OfferStatus.completed);
+    _offers[index] = previous.copyWith(
+      status: OfferStatus.completed,
+      completedAt: completedAt ?? DateTime.now(),
+    );
+    try {
+      await _persist();
+    } catch (_) {
+      _offers[index] = previous;
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> restoreOffer(String id) async {
+    final index = _offers.indexWhere((offer) => offer.id == id);
+    if (index == -1 || !_offers[index].isCompleted) return;
+
+    final previous = _offers[index];
+    _offers[index] = previous.copyWith(
+      status: OfferStatus.active,
+      clearCompletedAt: true,
+    );
     try {
       await _persist();
     } catch (_) {

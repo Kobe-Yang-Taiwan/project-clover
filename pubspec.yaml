@@ -1,7 +1,7 @@
 name: project_clover
 description: Android-first prototype for managing expiring everyday value.
 publish_to: none
-version: 0.6.0+6
+version: 0.7.0+7
 
 environment:
   sdk: '>=3.10.0 <4.0.0'

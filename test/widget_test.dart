@@ -125,6 +125,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(store.completedOffers.map((offer) => offer.id), contains('coffee'));
+    expect(store.completedOffers.first.completedAt, isNotNull);
     expect(find.text('已標記完成，成功保住這份價值！'), findsOneWidget);
+  });
+
+  testWidgets('completed offer can be restored to active', (tester) async {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'restore-offer',
+          name: '恢復測試',
+          expiresAt: DateTime.now().add(const Duration(days: 10)),
+          status: OfferStatus.completed,
+          completedAt: DateTime.now(),
+        ),
+      ],
+    );
+    await tester.pumpWidget(CloverApp(store: store));
+
+    await tester.tap(find.text('優惠清單'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('恢復測試'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('完成時間'), findsOneWidget);
+    expect(find.byKey(const Key('restore-offer-button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('restore-offer-button')));
+    await tester.pumpAndSettle();
+
+    expect(store.completedOffers, isEmpty);
+    expect(store.activeOffers.single.id, 'restore-offer');
+    expect(find.text('已恢復為待使用優惠'), findsOneWidget);
   });
 }

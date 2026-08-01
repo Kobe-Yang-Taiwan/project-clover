@@ -12,6 +12,7 @@ class Offer {
     this.reminderHour = 9,
     this.reminderMinute = 0,
     this.status = OfferStatus.active,
+    this.completedAt,
   });
 
   factory Offer.fromJson(Map<String, dynamic> json) {
@@ -50,6 +51,9 @@ class Offer {
         (status) => status.name == statusName,
         orElse: () => OfferStatus.active,
       ),
+      completedAt: json['completedAt'] == null
+          ? null
+          : DateTime.tryParse(json['completedAt'] as String),
     );
   }
 
@@ -65,6 +69,7 @@ class Offer {
   final int reminderHour;
   final int reminderMinute;
   final OfferStatus status;
+  final DateTime? completedAt;
 
   DateTime get effectiveReminderAt => DateTime(
         expiresAt.year,
@@ -76,7 +81,7 @@ class Offer {
 
   bool get isCompleted => status == OfferStatus.completed;
 
-  Map<String, Object> toJson() => {
+  Map<String, Object?> toJson() => {
         'id': id,
         'name': name,
         'expiresAt': expiresAt.toIso8601String(),
@@ -87,6 +92,7 @@ class Offer {
         'reminderHour': reminderHour,
         'reminderMinute': reminderMinute,
         'status': status.name,
+        'completedAt': completedAt?.toIso8601String(),
       };
 
   Offer copyWith({
@@ -99,6 +105,8 @@ class Offer {
     int? reminderHour,
     int? reminderMinute,
     OfferStatus? status,
+    DateTime? completedAt,
+    bool clearCompletedAt = false,
   }) {
     return Offer(
       id: id,
@@ -112,6 +120,8 @@ class Offer {
       reminderHour: reminderHour ?? this.reminderHour,
       reminderMinute: reminderMinute ?? this.reminderMinute,
       status: status ?? this.status,
+      completedAt:
+          clearCompletedAt ? null : completedAt ?? this.completedAt,
     );
   }
 }

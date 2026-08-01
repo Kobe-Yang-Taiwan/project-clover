@@ -331,7 +331,11 @@ class OfferListScreen extends StatelessWidget {
             (offer) => ListTile(
               leading: const Icon(Icons.check_circle, color: Color(0xFF2E7D5B)),
               title: Text(offer.name),
-              subtitle: Text('到期日 ${formatTaiwanDate(offer.expiresAt)}'),
+              subtitle: Text(
+                offer.completedAt == null
+                    ? '已完成・到期日 ${formatTaiwanDate(offer.expiresAt)}'
+                    : '完成於 ${formatTaiwanDateTime(offer.completedAt!)}',
+              ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push<void>(
                 MaterialPageRoute(
@@ -703,6 +707,13 @@ class OfferDetailsScreen extends StatelessWidget {
               ),
               if (offer.source.isNotEmpty) _DetailRow(label: '來源', value: offer.source),
               if (offer.note.isNotEmpty) _DetailRow(label: '備註', value: offer.note),
+              if (offer.isCompleted)
+                _DetailRow(
+                  label: '完成時間',
+                  value: offer.completedAt == null
+                      ? '未記錄（舊版資料）'
+                      : formatTaiwanDateTime(offer.completedAt!),
+                ),
               const SizedBox(height: 28),
               if (!offer.isCompleted) ...[
                 OutlinedButton.icon(
@@ -737,11 +748,19 @@ class OfferDetailsScreen extends StatelessWidget {
                   icon: const Icon(Icons.check),
                   label: const Text('標記為已使用'),
                 ),
-              ] else
+              ] else ...[
                 const Chip(
                   avatar: Icon(Icons.check_circle),
                   label: Text('已完成'),
                 ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  key: const Key('restore-offer-button'),
+                  onPressed: () => _restoreOffer(context, offer),
+                  icon: const Icon(Icons.undo),
+                  label: const Text('恢復為待使用'),
+                ),
+              ],
               const SizedBox(height: 8),
               TextButton.icon(
                 key: const Key('delete-offer-button'),
@@ -808,6 +827,27 @@ class OfferDetailsScreen extends StatelessWidget {
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(content: Text('刪除失敗，請稍後再試')),
+      );
+    }
+  }
+
+  Future<void> _restoreOffer(BuildContext context, Offer offer) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await store.restoreOffer(offer.id);
+      try {
+        await reminders.sync(store.activeOffers);
+      } catch (_) {
+        // Restoration is saved even if notification synchronization fails.
+      }
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('已恢復為待使用優惠')),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('恢復失敗，請稍後再試')),
       );
     }
   }

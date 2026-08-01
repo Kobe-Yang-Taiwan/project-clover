@@ -26,6 +26,53 @@ void main() {
 
     expect(store.activeOffers, isEmpty);
     expect(store.completedOffers.single.name, '測試優惠');
+    expect(store.completedOffers.single.completedAt, isNotNull);
+  });
+
+  test('completed offers are sorted by most recent completion time', () {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'older',
+          name: '較早完成',
+          expiresAt: DateTime(2026, 8, 10),
+          status: OfferStatus.completed,
+          completedAt: DateTime(2026, 8, 1, 9),
+        ),
+        Offer(
+          id: 'newer',
+          name: '最近完成',
+          expiresAt: DateTime(2026, 8, 1),
+          status: OfferStatus.completed,
+          completedAt: DateTime(2026, 8, 2, 9),
+        ),
+      ],
+    );
+
+    expect(store.completedOffers.map((offer) => offer.id), ['newer', 'older']);
+  });
+
+  test('restoring a completed offer persists and clears completion time', () async {
+    final storage = MemoryOfferStorage();
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'restore-me',
+          name: '誤標完成',
+          expiresAt: DateTime(2026, 8, 10),
+          status: OfferStatus.completed,
+          completedAt: DateTime(2026, 8, 1, 12),
+        ),
+      ],
+      storage: storage,
+    );
+
+    await store.restoreOffer('restore-me');
+    final reopened = await OfferStore.load(storage: storage);
+
+    expect(reopened.completedOffers, isEmpty);
+    expect(reopened.activeOffers.single.id, 'restore-me');
+    expect(reopened.activeOffers.single.completedAt, isNull);
   });
 
   test('saved offers survive a new store instance', () async {
@@ -132,6 +179,7 @@ void main() {
       reminderHour: 18,
       reminderMinute: 30,
       status: OfferStatus.completed,
+      completedAt: DateTime(2026, 8, 1, 18, 45),
     );
 
     final restored = Offer.fromJson(original.toJson());
@@ -146,6 +194,7 @@ void main() {
     expect(restored.reminderHour, 18);
     expect(restored.reminderMinute, 30);
     expect(restored.status, OfferStatus.completed);
+    expect(restored.completedAt, DateTime(2026, 8, 1, 18, 45));
   });
 }
 
