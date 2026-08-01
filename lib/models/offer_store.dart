@@ -38,7 +38,7 @@ class OfferStore extends ChangeNotifier {
     }).length;
   }
 
-  Future<void> addOffer({
+  Future<Offer> addOffer({
     required String name,
     required DateTime expiresAt,
     String source = '',
@@ -59,6 +59,7 @@ class OfferStore extends ChangeNotifier {
       rethrow;
     }
     notifyListeners();
+    return offer;
   }
 
   Future<void> markCompleted(String id) async {
