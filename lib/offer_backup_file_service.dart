@@ -27,7 +27,7 @@ class FilePickerOfferBackupFileService implements OfferBackupFileService {
     required String fileName,
     required String content,
   }) async {
-    final savedPath = await FilePicker.saveFile(
+    final savedPath = await FilePicker.platform.saveFile(
       dialogTitle: '儲存 Project Clover 備份',
       fileName: fileName,
       type: FileType.custom,
@@ -39,7 +39,7 @@ class FilePickerOfferBackupFileService implements OfferBackupFileService {
 
   @override
   Future<OfferBackupFile?> pickBackup() async {
-    final result = await FilePicker.pickFiles(
+    final result = await FilePicker.platform.pickFiles(
       dialogTitle: '選擇 Project Clover 備份',
       type: FileType.custom,
       allowedExtensions: const ['json'],
