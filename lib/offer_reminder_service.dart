@@ -66,22 +66,25 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler {
   Future<void> sync(Iterable<Offer> activeOffers) async {
     await _notifications.cancelAll();
     final now = tz.TZDateTime.now(tz.local);
-    final offers = activeOffers.where((offer) => !offer.isCompleted).take(100);
+    final offers = activeOffers
+        .where((offer) => !offer.isCompleted && offer.reminderEnabled)
+        .take(100);
 
     for (final offer in offers) {
-      final reminder = reminderDateFor(offer);
+      final reminder = offer.effectiveReminderAt;
       final scheduledDate = tz.TZDateTime(
         tz.local,
         reminder.year,
         reminder.month,
         reminder.day,
         reminder.hour,
+        reminder.minute,
       );
       if (!scheduledDate.isAfter(now)) continue;
 
       await _notifications.zonedSchedule(
         id: notificationIdFor(offer.id),
-        title: '明天到期：${offer.name}',
+        title: '優惠即將到期：${offer.name}',
         body: '記得在期限前使用，別讓優惠悄悄溜走。',
         scheduledDate: scheduledDate,
         notificationDetails: _details,
@@ -97,15 +100,6 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler {
   }
 }
 
-DateTime reminderDateFor(Offer offer) {
-  final expiryAtNine = DateTime(
-    offer.expiresAt.year,
-    offer.expiresAt.month,
-    offer.expiresAt.day,
-    9,
-  );
-  return expiryAtNine.subtract(const Duration(days: 1));
-}
 
 int notificationIdFor(String offerId) {
   var hash = 0x811C9DC5;
