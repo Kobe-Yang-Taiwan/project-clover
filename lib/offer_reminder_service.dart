@@ -80,11 +80,11 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler {
       if (!scheduledDate.isAfter(now)) continue;
 
       await _notifications.zonedSchedule(
-        _notificationId(offer.id),
+        id: notificationIdFor(offer.id),
         title: '明天到期：${offer.name}',
         body: '記得在期限前使用，別讓優惠悄悄溜走。',
         scheduledDate: scheduledDate,
-        _details,
+        notificationDetails: _details,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         payload: offer.id,
       );
@@ -93,7 +93,7 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler {
 
   @override
   Future<void> cancel(String offerId) {
-    return _notifications.cancel(id: _notificationId(offerId));
+    return _notifications.cancel(id: notificationIdFor(offerId));
   }
 }
 
@@ -107,7 +107,7 @@ DateTime reminderDateFor(Offer offer) {
   return expiryAtNine.subtract(const Duration(days: 1));
 }
 
-int _notificationId(String offerId) {
+int notificationIdFor(String offerId) {
   var hash = 0x811C9DC5;
   for (final unit in offerId.codeUnits) {
     hash ^= unit;
