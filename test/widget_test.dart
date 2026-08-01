@@ -14,6 +14,9 @@ void main() {
     expect(find.text('新增優惠'), findsWidgets);
     expect(find.byKey(const Key('offer-name-field')), findsOneWidget);
     expect(find.byKey(const Key('expiry-date-field')), findsOneWidget);
+    expect(find.byKey(const Key('reminder-switch')), findsOneWidget);
+    expect(find.text('到期提醒'), findsOneWidget);
+    expect(find.text('請先選擇到期日'), findsOneWidget);
   });
 
   testWidgets('offer can be marked completed', (tester) async {
