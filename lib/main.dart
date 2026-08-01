@@ -3,19 +3,32 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'models/offer.dart';
 import 'models/offer_store.dart';
+import 'offer_reminder_service.dart';
 import 'theme.dart';
 import 'widgets/offer_card.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final store = await OfferStore.load();
-  runApp(CloverApp(store: store));
+  OfferReminderScheduler reminders = const NoopOfferReminderScheduler();
+  try {
+    reminders = await AndroidOfferReminderScheduler.create();
+    await reminders.sync(store.activeOffers);
+  } catch (_) {
+    // Notifications are optional; storage and the core app must still start.
+  }
+  runApp(CloverApp(store: store, reminders: reminders));
 }
 
 class CloverApp extends StatefulWidget {
-  const CloverApp({super.key, this.store});
+  const CloverApp({
+    super.key,
+    this.store,
+    this.reminders = const NoopOfferReminderScheduler(),
+  });
 
   final OfferStore? store;
+  final OfferReminderScheduler reminders;
 
   @override
   State<CloverApp> createState() => _CloverAppState();
@@ -43,15 +56,20 @@ class _CloverAppState extends State<CloverApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: CloverHome(store: store),
+      home: CloverHome(store: store, reminders: widget.reminders),
     );
   }
 }
 
 class CloverHome extends StatefulWidget {
-  const CloverHome({required this.store, super.key});
+  const CloverHome({
+    required this.store,
+    required this.reminders,
+    super.key,
+  });
 
   final OfferStore store;
+  final OfferReminderScheduler reminders;
 
   @override
   State<CloverHome> createState() => _CloverHomeState();
@@ -70,8 +88,14 @@ class _CloverHomeState extends State<CloverHome> {
             title: Text(currentIndex == 0 ? '今天值得使用' : '我的優惠'),
           ),
           body: currentIndex == 0
-              ? TodayScreen(store: widget.store)
-              : OfferListScreen(store: widget.store),
+              ? TodayScreen(
+                  store: widget.store,
+                  reminders: widget.reminders,
+                )
+              : OfferListScreen(
+                  store: widget.store,
+                  reminders: widget.reminders,
+                ),
           floatingActionButton: FloatingActionButton.extended(
             key: const Key('add-offer-button'),
             onPressed: () => _openAddOffer(context),
@@ -101,15 +125,25 @@ class _CloverHomeState extends State<CloverHome> {
 
   Future<void> _openAddOffer(BuildContext context) async {
     await Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => AddOfferScreen(store: widget.store)),
+      MaterialPageRoute(
+        builder: (_) => AddOfferScreen(
+          store: widget.store,
+          reminders: widget.reminders,
+        ),
+      ),
     );
   }
 }
 
 class TodayScreen extends StatelessWidget {
-  const TodayScreen({required this.store, super.key});
+  const TodayScreen({
+    required this.store,
+    required this.reminders,
+    super.key,
+  });
 
   final OfferStore store;
+  final OfferReminderScheduler reminders;
 
   @override
   Widget build(BuildContext context) {
@@ -157,16 +191,25 @@ class TodayScreen extends StatelessWidget {
   void _openDetails(BuildContext context, Offer offer) {
     Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => OfferDetailsScreen(store: store, offerId: offer.id),
+        builder: (_) => OfferDetailsScreen(
+          store: store,
+          reminders: reminders,
+          offerId: offer.id,
+        ),
       ),
     );
   }
 }
 
 class OfferListScreen extends StatelessWidget {
-  const OfferListScreen({required this.store, super.key});
+  const OfferListScreen({
+    required this.store,
+    required this.reminders,
+    super.key,
+  });
 
   final OfferStore store;
+  final OfferReminderScheduler reminders;
 
   @override
   Widget build(BuildContext context) {
@@ -184,7 +227,11 @@ class OfferListScreen extends StatelessWidget {
               offer: offer,
               onTap: () => Navigator.of(context).push<void>(
                 MaterialPageRoute(
-                  builder: (_) => OfferDetailsScreen(store: store, offerId: offer.id),
+                  builder: (_) => OfferDetailsScreen(
+                    store: store,
+                    reminders: reminders,
+                    offerId: offer.id,
+                  ),
                 ),
               ),
             ),
@@ -209,9 +256,14 @@ class OfferListScreen extends StatelessWidget {
 }
 
 class AddOfferScreen extends StatefulWidget {
-  const AddOfferScreen({required this.store, super.key});
+  const AddOfferScreen({
+    required this.store,
+    required this.reminders,
+    super.key,
+  });
 
   final OfferStore store;
+  final OfferReminderScheduler reminders;
 
   @override
   State<AddOfferScreen> createState() => _AddOfferScreenState();
@@ -315,8 +367,25 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
         source: sourceController.text,
         note: noteController.text,
       );
+
+      var reminderFailed = false;
+      try {
+        final granted = await widget.reminders.requestPermission();
+        if (granted) {
+          await widget.reminders.sync(widget.store.activeOffers);
+        }
+      } catch (_) {
+        reminderFailed = true;
+      }
+
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
+      if (reminderFailed) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('優惠已儲存，但提醒設定失敗')),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() => isSaving = false);
@@ -330,11 +399,13 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
 class OfferDetailsScreen extends StatelessWidget {
   const OfferDetailsScreen({
     required this.store,
+    required this.reminders,
     required this.offerId,
     super.key,
   });
 
   final OfferStore store;
+  final OfferReminderScheduler reminders;
   final String offerId;
 
   @override
@@ -371,6 +442,11 @@ class OfferDetailsScreen extends StatelessWidget {
                     final messenger = ScaffoldMessenger.of(context);
                     try {
                       await store.markCompleted(offer.id);
+                      try {
+                        await reminders.cancel(offer.id);
+                      } catch (_) {
+                        // Completion is saved even if reminder cancellation fails.
+                      }
                       if (!context.mounted) return;
                       Navigator.of(context).pop();
                       messenger.showSnackBar(
