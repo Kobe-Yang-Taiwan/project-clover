@@ -332,6 +332,16 @@ class OfferListScreen extends StatelessWidget {
               leading: const Icon(Icons.check_circle, color: Color(0xFF2E7D5B)),
               title: Text(offer.name),
               subtitle: Text('到期日 ${formatTaiwanDate(offer.expiresAt)}'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => OfferDetailsScreen(
+                    store: store,
+                    reminders: reminders,
+                    offerId: offer.id,
+                  ),
+                ),
+              ),
             ),
           ),
       ],
