@@ -7,6 +7,8 @@ class Offer {
     required this.expiresAt,
     this.source = '',
     this.note = '',
+    this.reminderEnabled = true,
+    this.reminderAt,
     this.status = OfferStatus.active,
   });
 
@@ -18,6 +20,10 @@ class Offer {
       expiresAt: DateTime.parse(json['expiresAt'] as String),
       source: json['source'] as String? ?? '',
       note: json['note'] as String? ?? '',
+      reminderEnabled: json['reminderEnabled'] as bool? ?? true,
+      reminderAt: json['reminderAt'] == null
+          ? null
+          : DateTime.parse(json['reminderAt'] as String),
       status: OfferStatus.values.firstWhere(
         (status) => status.name == statusName,
         orElse: () => OfferStatus.active,
@@ -30,7 +36,14 @@ class Offer {
   final DateTime expiresAt;
   final String source;
   final String note;
+  final bool reminderEnabled;
+  final DateTime? reminderAt;
   final OfferStatus status;
+
+  DateTime get effectiveReminderAt =>
+      reminderAt ??
+      DateTime(expiresAt.year, expiresAt.month, expiresAt.day, 9)
+          .subtract(const Duration(days: 1));
 
   bool get isCompleted => status == OfferStatus.completed;
 
@@ -40,6 +53,8 @@ class Offer {
         'expiresAt': expiresAt.toIso8601String(),
         'source': source,
         'note': note,
+        'reminderEnabled': reminderEnabled,
+        if (reminderAt != null) 'reminderAt': reminderAt!.toIso8601String(),
         'status': status.name,
       };
 
@@ -50,6 +65,8 @@ class Offer {
       expiresAt: expiresAt,
       source: source,
       note: note,
+      reminderEnabled: reminderEnabled,
+      reminderAt: reminderAt,
       status: status ?? this.status,
     );
   }
