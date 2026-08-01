@@ -727,21 +727,21 @@ class OfferDetailsScreen extends StatelessWidget {
                   icon: const Icon(Icons.check),
                   label: const Text('標記為已使用'),
                 ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  key: const Key('delete-offer-button'),
-                  onPressed: () => _deleteOffer(context, offer),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
-                  ),
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('刪除優惠'),
-                ),
               ] else
                 const Chip(
                   avatar: Icon(Icons.check_circle),
                   label: Text('已完成'),
                 ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                key: const Key('delete-offer-button'),
+                onPressed: () => _deleteOffer(context, offer),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('刪除優惠'),
+              ),
             ],
           ),
         );
