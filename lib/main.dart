@@ -360,7 +360,8 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
   final noteController = TextEditingController();
   DateTime? expiresAt;
   bool reminderEnabled = true;
-  DateTime? reminderAt;
+  int reminderDaysBefore = 1;
+  TimeOfDay reminderTime = const TimeOfDay(hour: 9, minute: 0);
   String? reminderError;
 
   @override
@@ -413,29 +414,47 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
                 setState(() {
                   reminderEnabled = value;
                   reminderError = null;
-                  if (value && reminderAt == null && expiresAt != null) {
-                    reminderAt = _defaultReminderAtFor(expiresAt!);
-                  }
                 });
               },
             ),
             if (reminderEnabled) ...[
               const SizedBox(height: 4),
+              DropdownButtonFormField<int>(
+                key: const Key('reminder-days-field'),
+                initialValue: reminderDaysBefore,
+                decoration: const InputDecoration(labelText: '提前提醒'),
+                items: Offer.supportedReminderDays
+                    .map(
+                      (days) => DropdownMenuItem(
+                        value: days,
+                        child: Text('$days 天前'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (days) {
+                  if (days == null) return;
+                  setState(() {
+                    reminderDaysBefore = days;
+                    reminderError = null;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
               InkWell(
-                key: const Key('reminder-date-time-field'),
-                onTap: expiresAt == null ? null : _selectReminderDateTime,
+                key: const Key('reminder-time-field'),
+                onTap: _selectReminderTime,
                 child: InputDecorator(
                   decoration: InputDecoration(
-                    labelText: '提醒日期與時間',
-                    helperText: expiresAt == null ? '請先選擇到期日' : null,
+                    labelText: '提醒時間',
                     errorText: reminderError,
                   ),
-                  child: Text(
-                    reminderAt == null
-                        ? '選擇提醒日期與時間'
-                        : formatTaiwanDateTime(reminderAt!),
-                  ),
+                  child: Text(formatTaiwanTime(reminderTime)),
                 ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '切換提前天數時，提醒時間會維持不變',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
             const SizedBox(height: 16),
@@ -482,78 +501,46 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
     if (selected != null) {
       setState(() {
         expiresAt = selected;
-        reminderAt = _defaultReminderAtFor(selected);
         reminderError = null;
       });
     }
   }
 
-  DateTime _defaultReminderAtFor(DateTime expiry) {
-    final now = DateTime.now();
-    final preferred = DateTime(expiry.year, expiry.month, expiry.day, 9)
-        .subtract(const Duration(days: 1));
-    if (preferred.isAfter(now)) return preferred;
-
-    final soon = now.add(const Duration(minutes: 5));
-    return DateTime(soon.year, soon.month, soon.day, soon.hour, soon.minute);
-  }
-
-  Future<void> _selectReminderDateTime() async {
-    final expiry = expiresAt;
-    if (expiry == null) return;
-
-    final now = DateTime.now();
-    final initial = reminderAt ?? _defaultReminderAtFor(expiry);
-    final selectedDate = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(now.year, now.month, now.day),
-      lastDate: DateTime(expiry.year, expiry.month, expiry.day),
-      locale: const Locale('zh', 'TW'),
-    );
-    if (selectedDate == null || !mounted) return;
-
+  Future<void> _selectReminderTime() async {
     final selectedTime = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
+      initialTime: reminderTime,
       helpText: '選擇提醒時間',
     );
     if (selectedTime == null) return;
 
     setState(() {
-      reminderAt = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-        selectedTime.hour,
-        selectedTime.minute,
-      );
+      reminderTime = selectedTime;
       reminderError = null;
     });
+  }
+
+  DateTime _selectedReminderAt() {
+    final expiry = expiresAt!;
+    return DateTime(
+      expiry.year,
+      expiry.month,
+      expiry.day,
+      reminderTime.hour,
+      reminderTime.minute,
+    ).subtract(Duration(days: reminderDaysBefore));
   }
 
   Future<void> _save() async {
     setState(() => attemptedSubmit = true);
     if (!(formKey.currentState?.validate() ?? false) || expiresAt == null) return;
 
-    if (reminderEnabled) {
-      final selectedReminder = reminderAt;
-      final expiryEnd = DateTime(
-        expiresAt!.year,
-        expiresAt!.month,
-        expiresAt!.day,
-        23,
-        59,
-        59,
+    if (reminderEnabled && !_selectedReminderAt().isAfter(DateTime.now())) {
+      setState(
+        () => reminderError =
+            '提前 $reminderDaysBefore 天的 ${formatTaiwanTime(reminderTime)} 已經過了',
       );
-      if (selectedReminder == null || !selectedReminder.isAfter(DateTime.now())) {
-        setState(() => reminderError = '提醒時間必須晚於現在');
-        return;
-      }
-      if (selectedReminder.isAfter(expiryEnd)) {
-        setState(() => reminderError = '提醒時間不能晚於到期日');
-        return;
-      }
+      return;
     }
 
     setState(() {
@@ -567,7 +554,9 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
         source: sourceController.text,
         note: noteController.text,
         reminderEnabled: reminderEnabled,
-        reminderAt: reminderEnabled ? reminderAt : null,
+        reminderDaysBefore: reminderDaysBefore,
+        reminderHour: reminderTime.hour,
+        reminderMinute: reminderTime.minute,
       );
 
       var reminderFailed = false;
@@ -648,7 +637,11 @@ class OfferDetailsScreen extends StatelessWidget {
               _DetailRow(
                 label: '提醒',
                 value: offer.reminderEnabled
-                    ? formatTaiwanDateTime(offer.effectiveReminderAt)
+                    ? '提前 ${offer.reminderDaysBefore} 天・'
+                        '${formatTaiwanTime(TimeOfDay(
+                          hour: offer.reminderHour,
+                          minute: offer.reminderMinute,
+                        ))}'
                     : '已關閉',
               ),
               if (offer.source.isNotEmpty) _DetailRow(label: '來源', value: offer.source),
@@ -735,9 +728,14 @@ class _EmptyState extends StatelessWidget {
 }
 
 String formatTaiwanDateTime(DateTime value) {
+  return '${formatTaiwanDate(value)} '
+      '${formatTaiwanTime(TimeOfDay.fromDateTime(value))}';
+}
+
+String formatTaiwanTime(TimeOfDay value) {
   final hour = value.hour.toString().padLeft(2, '0');
   final minute = value.minute.toString().padLeft(2, '0');
-  return '${formatTaiwanDate(value)} $hour:$minute';
+  return '$hour:$minute';
 }
 
 extension _FirstOrNull<E> on Iterable<E> {
