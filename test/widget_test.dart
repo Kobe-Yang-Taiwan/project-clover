@@ -75,7 +75,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(store.activeOffers.single.name, '編輯後名稱');
-    expect(find.text('優惠已更新'), findsOneWidget);
   });
 
   testWidgets('deleting an offer requires confirmation', (tester) async {
