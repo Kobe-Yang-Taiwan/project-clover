@@ -2,7 +2,7 @@
 
 Project Clover 是一款 Android 優先的優惠管理原型，協助使用者快速看見即將到期的優惠，避免已擁有的價值因遺忘而浪費。
 
-## Prototype V0.3 已包含
+## Prototype V0.4 已包含
 
 - 今日首頁：依到期急迫程度排列待使用優惠
 - 優惠清單：分開顯示待使用與已完成項目
@@ -15,6 +15,7 @@ Project Clover 是一款 Android 優先的優惠管理原型，協助使用者�
 - 依 Android 手機時區安排通知
 - 儲存與通知失敗保護
 - 繁體中文介面與台灣日期格式
+- 軟體資訊：首頁右上角可查看實際安裝版本與 Build 編號
 - GitHub Actions 自動分析、測試及建置 Android Debug APK
 
 ## 通知行為
