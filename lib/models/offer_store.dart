@@ -13,6 +13,8 @@ class OfferStore extends ChangeNotifier {
   final List<Offer> _offers;
   final OfferStorage? _storage;
 
+  List<Offer> get allOffers => List<Offer>.unmodifiable(_offers);
+
   static Future<OfferStore> load({OfferStorage? storage}) async {
     final persistence = storage ?? SharedPreferencesOfferStorage();
     final savedOffers = await persistence.loadOffers();
@@ -160,6 +162,22 @@ class OfferStore extends ChangeNotifier {
       await _persist();
     } catch (_) {
       _offers[index] = previous;
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> replaceAll(Iterable<Offer> offers) async {
+    final previous = List<Offer>.from(_offers);
+    _offers
+      ..clear()
+      ..addAll(offers);
+    try {
+      await _persist();
+    } catch (_) {
+      _offers
+        ..clear()
+        ..addAll(previous);
       rethrow;
     }
     notifyListeners();

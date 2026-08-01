@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:project_clover/main.dart';
 import 'package:project_clover/models/offer.dart';
+import 'package:project_clover/models/offer_backup.dart';
 import 'package:project_clover/models/offer_store.dart';
+import 'package:project_clover/offer_backup_file_service.dart';
 
 void main() {
   testWidgets('founder can open the add-offer flow', (tester) async {
@@ -10,6 +12,7 @@ void main() {
 
     expect(find.text('今天值得使用'), findsOneWidget);
     expect(find.byKey(const Key('app-info-button')), findsOneWidget);
+    expect(find.byKey(const Key('backup-button')), findsOneWidget);
     await tester.tap(find.byKey(const Key('add-offer-button')));
     await tester.pumpAndSettle();
 
@@ -157,4 +160,96 @@ void main() {
     expect(store.activeOffers.single.id, 'restore-offer');
     expect(find.text('已恢復為待使用優惠'), findsOneWidget);
   });
+
+  testWidgets('founder can export a local backup', (tester) async {
+    final backupFiles = FakeBackupFileService();
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'exported',
+          name: '要備份的優惠',
+          expiresAt: DateTime(2026, 9, 1),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      CloverApp(store: store, backupFiles: backupFiles),
+    );
+
+    await tester.tap(find.byKey(const Key('backup-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('export-backup-button')));
+    await tester.pumpAndSettle();
+
+    final exported = OfferBackupCodec.decode(backupFiles.exportedContent!);
+    expect(exported.offers.single.id, 'exported');
+    expect(backupFiles.exportedName, startsWith('project-clover-backup-'));
+    expect(find.text('已備份 1 筆優惠'), findsOneWidget);
+  });
+
+  testWidgets('restoring backup requires confirmation and replaces data', (tester) async {
+    final backupFiles = FakeBackupFileService(
+      importedFile: OfferBackupFile(
+        name: 'project-clover-backup.json',
+        content: OfferBackupCodec.encode(
+          [
+            Offer(
+              id: 'from-backup',
+              name: '備份內優惠',
+              expiresAt: DateTime(2026, 9, 1),
+            ),
+          ],
+          exportedAt: DateTime(2026, 8, 1, 20, 30),
+        ),
+      ),
+    );
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'on-phone',
+          name: '手機原優惠',
+          expiresAt: DateTime(2026, 8, 10),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      CloverApp(store: store, backupFiles: backupFiles),
+    );
+
+    await tester.tap(find.byKey(const Key('backup-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('import-backup-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('還原這份備份？'), findsOneWidget);
+    expect(find.textContaining('待使用 1 筆、已完成 0 筆'), findsOneWidget);
+    expect(store.allOffers.single.id, 'on-phone');
+
+    await tester.tap(find.byKey(const Key('confirm-import-backup-button')));
+    await tester.pumpAndSettle();
+
+    expect(store.allOffers.single.id, 'from-backup');
+    expect(find.text('已還原 1 筆優惠'), findsOneWidget);
+  });
+}
+
+class FakeBackupFileService implements OfferBackupFileService {
+  FakeBackupFileService({this.importedFile});
+
+  final OfferBackupFile? importedFile;
+  String? exportedName;
+  String? exportedContent;
+
+  @override
+  Future<OfferBackupFile?> pickBackup() async => importedFile;
+
+  @override
+  Future<bool> saveBackup({
+    required String fileName,
+    required String content,
+  }) async {
+    exportedName = fileName;
+    exportedContent = content;
+    return true;
+  }
 }

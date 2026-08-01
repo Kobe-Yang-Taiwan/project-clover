@@ -75,6 +75,33 @@ void main() {
     expect(reopened.activeOffers.single.completedAt, isNull);
   });
 
+  test('replacing all offers persists restored backup data', () async {
+    final storage = MemoryOfferStorage();
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'old',
+          name: '手機原資料',
+          expiresAt: DateTime(2026, 8, 10),
+        ),
+      ],
+      storage: storage,
+    );
+    final restoredOffers = [
+      Offer(
+        id: 'restored',
+        name: '備份資料',
+        expiresAt: DateTime(2026, 9, 1),
+      ),
+    ];
+
+    await store.replaceAll(restoredOffers);
+    final reopened = await OfferStore.load(storage: storage);
+
+    expect(reopened.allOffers, hasLength(1));
+    expect(reopened.allOffers.single.id, 'restored');
+  });
+
   test('saved offers survive a new store instance', () async {
     final storage = MemoryOfferStorage();
     final firstStore = OfferStore(initialOffers: [], storage: storage);

@@ -3,7 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'models/offer.dart';
+import 'models/offer_backup.dart';
 import 'models/offer_store.dart';
+import 'offer_backup_file_service.dart';
 import 'offer_reminder_service.dart';
 import 'theme.dart';
 import 'widgets/offer_card.dart';
@@ -51,12 +53,14 @@ class CloverApp extends StatefulWidget {
     this.reminders = const NoopOfferReminderScheduler(),
     this.navigatorKey,
     this.initialOfferId,
+    this.backupFiles,
   });
 
   final OfferStore? store;
   final OfferReminderScheduler reminders;
   final GlobalKey<NavigatorState>? navigatorKey;
   final String? initialOfferId;
+  final OfferBackupFileService? backupFiles;
 
   @override
   State<CloverApp> createState() => _CloverAppState();
@@ -64,6 +68,8 @@ class CloverApp extends StatefulWidget {
 
 class _CloverAppState extends State<CloverApp> {
   late final OfferStore store = widget.store ?? OfferStore();
+  late final OfferBackupFileService backupFiles =
+      widget.backupFiles ?? FilePickerOfferBackupFileService();
 
   @override
   void initState() {
@@ -104,7 +110,11 @@ class _CloverAppState extends State<CloverApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: CloverHome(store: store, reminders: widget.reminders),
+      home: CloverHome(
+        store: store,
+        reminders: widget.reminders,
+        backupFiles: backupFiles,
+      ),
     );
   }
 }
@@ -113,11 +123,13 @@ class CloverHome extends StatefulWidget {
   const CloverHome({
     required this.store,
     required this.reminders,
+    required this.backupFiles,
     super.key,
   });
 
   final OfferStore store;
   final OfferReminderScheduler reminders;
+  final OfferBackupFileService backupFiles;
 
   @override
   State<CloverHome> createState() => _CloverHomeState();
@@ -135,6 +147,12 @@ class _CloverHomeState extends State<CloverHome> {
           appBar: AppBar(
             title: Text(currentIndex == 0 ? '今天值得使用' : '我的優惠'),
             actions: [
+              IconButton(
+                key: const Key('backup-button'),
+                tooltip: '資料備份與還原',
+                onPressed: _showBackupOptions,
+                icon: const Icon(Icons.save_alt),
+              ),
               IconButton(
                 key: const Key('app-info-button'),
                 tooltip: '軟體資訊',
@@ -203,6 +221,129 @@ class _CloverHomeState extends State<CloverHome> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('目前無法讀取軟體版本')),
+      );
+    }
+  }
+
+  Future<void> _showBackupOptions() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('資料備份與還原', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              const Text('備份檔只會存到你選擇的位置，不會上傳 Project Clover 伺服器。'),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                key: const Key('export-backup-button'),
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  _exportBackup();
+                },
+                icon: const Icon(Icons.download_outlined),
+                label: const Text('匯出備份'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: const Key('import-backup-button'),
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  _importBackup();
+                },
+                icon: const Icon(Icons.upload_file_outlined),
+                label: const Text('從備份還原'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportBackup() async {
+    final now = DateTime.now();
+    final date = '${now.year}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}';
+    final content = OfferBackupCodec.encode(widget.store.allOffers, exportedAt: now);
+    try {
+      final saved = await widget.backupFiles.saveBackup(
+        fileName: 'project-clover-backup-$date.json',
+        content: content,
+      );
+      if (!mounted || !saved) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已備份 ${widget.store.allOffers.length} 筆優惠')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('備份失敗，請稍後再試')),
+      );
+    }
+  }
+
+  Future<void> _importBackup() async {
+    try {
+      final file = await widget.backupFiles.pickBackup();
+      if (!mounted || file == null) return;
+      final backup = OfferBackupCodec.decode(file.content);
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('還原這份備份？'),
+          content: Text(
+            '備份時間：${formatTaiwanDateTime(backup.exportedAt)}\n'
+            '待使用 ${backup.activeCount} 筆、已完成 ${backup.completedCount} 筆。\n\n'
+            '還原後會取代手機目前的 ${widget.store.allOffers.length} 筆資料。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              key: const Key('confirm-import-backup-button'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('確認還原'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+
+      await widget.store.replaceAll(backup.offers);
+      var remindersSynced = true;
+      try {
+        await widget.reminders.sync(widget.store.activeOffers);
+      } catch (_) {
+        remindersSynced = false;
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            remindersSynced
+                ? '已還原 ${backup.offers.length} 筆優惠'
+                : '資料已還原，但提醒同步失敗',
+          ),
+        ),
+      );
+    } on FormatException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message.toString())),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('還原失敗，請確認備份檔是否正確')),
       );
     }
   }
