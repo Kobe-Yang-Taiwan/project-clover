@@ -6,7 +6,11 @@ import 'models/offer_store.dart';
 import 'theme.dart';
 import 'widgets/offer_card.dart';
 
-void main() => runApp(const CloverApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final store = await OfferStore.load();
+  runApp(CloverApp(store: store));
+}
 
 class CloverApp extends StatefulWidget {
   const CloverApp({super.key, this.store});
@@ -269,9 +273,14 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
             const SizedBox(height: 24),
             FilledButton.icon(
               key: const Key('save-offer-button'),
-              onPressed: _save,
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('儲存優惠'),
+              onPressed: isSaving ? null : _save,
+              icon: isSaving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(isSaving ? '儲存中…' : '儲存優惠'),
             ),
           ],
         ),
@@ -280,6 +289,7 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
   }
 
   bool attemptedSubmit = false;
+  bool isSaving = false;
 
   Future<void> _selectDate() async {
     final now = DateTime.now();
@@ -293,16 +303,27 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
     if (selected != null) setState(() => expiresAt = selected);
   }
 
-  void _save() {
+  Future<void> _save() async {
     setState(() => attemptedSubmit = true);
     if (!(formKey.currentState?.validate() ?? false) || expiresAt == null) return;
-    widget.store.addOffer(
-      name: nameController.text,
-      expiresAt: expiresAt!,
-      source: sourceController.text,
-      note: noteController.text,
-    );
-    Navigator.of(context).pop();
+
+    setState(() => isSaving = true);
+    try {
+      await widget.store.addOffer(
+        name: nameController.text,
+        expiresAt: expiresAt!,
+        source: sourceController.text,
+        note: noteController.text,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('儲存失敗，請稍後再試')),
+      );
+    }
   }
 }
 
@@ -346,13 +367,20 @@ class OfferDetailsScreen extends StatelessWidget {
               if (!offer.isCompleted)
                 FilledButton.icon(
                   key: const Key('complete-offer-button'),
-                  onPressed: () {
+                  onPressed: () async {
                     final messenger = ScaffoldMessenger.of(context);
-                    store.markCompleted(offer.id);
-                    Navigator.of(context).pop();
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('已標記完成，成功保住這份價值！')),
-                    );
+                    try {
+                      await store.markCompleted(offer.id);
+                      if (!context.mounted) return;
+                      Navigator.of(context).pop();
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('已標記完成，成功保住這份價值！')),
+                      );
+                    } catch (_) {
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('更新失敗，請稍後再試')),
+                      );
+                    }
                   },
                   icon: const Icon(Icons.check),
                   label: const Text('標記為已使用'),
