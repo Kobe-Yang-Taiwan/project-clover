@@ -2,28 +2,38 @@
 
 Project Clover 是一款 Android 優先的優惠管理原型，協助使用者快速看見即將到期的優惠，避免已擁有的價值因遺忘而浪費。
 
-## Prototype V0.1 已包含
+## Prototype V0.2 已包含
 
 - 今日首頁：依到期急迫程度排列待使用優惠
 - 優惠清單：分開顯示待使用與已完成項目
 - 新增優惠：名稱與到期日為必填，來源與備註為選填
 - 優惠詳情：查看內容並標記完成
-- 本機永久保存：新增內容與完成狀態在重新啟動 App 後仍會保留
-- 儲存失敗保護與繁體中文錯誤提示
+- 本機永久保存：重新啟動 App 後，新增內容與完成狀態仍會保留
+- Android 到期提醒：預設於到期前一天上午 9:00 提醒
+- 完成優惠後自動取消該筆提醒
+- 依 Android 手機時區安排通知
+- 儲存與通知失敗保護
 - 繁體中文介面與台灣日期格式
-- 資料邏輯、永久保存與 Widget 測試
 - GitHub Actions 自動分析、測試及建置 Android Debug APK
+
+## 通知行為
+
+- 第一次新增優惠時，Android 會詢問是否允許通知
+- 使用者拒絕通知時，優惠仍會正常儲存
+- 到期前一天上午 9:00 已經過去的優惠，不會補發舊提醒
+- 最多安排近期 100 筆待使用優惠，避免手機排程數量過多
+- 某些 Android 品牌的省電設定可能延遲背景通知
 
 ## 資料與隱私
 
-- 優惠資料目前只儲存在使用者自己的 Android 手機
+- 優惠資料只儲存在使用者自己的 Android 手機
 - 本版不會把資料上傳到網路或雲端
 - 解除安裝 App 或清除 App 資料會刪除已保存的優惠
 - 首次安裝會顯示三筆示範資料；之後會載入手機已保存的資料
 
 ## 本版限制
 
-- 尚未加入 Android 系統通知
+- 通知時間尚未提供使用者自行調整
 - 不包含登入、雲端同步、OCR、AI、家庭共享與商業功能
 - Repository 採 source-only 管理；Android 平台檔在建置時由 Flutter CLI 產生
 
@@ -31,8 +41,8 @@ Project Clover 是一款 Android 優先的優惠管理原型，協助使用者�
 
 每次 Pull Request 都會執行：
 
-1. 產生 Android 平台檔
-2. Dart 格式檢查
+1. 產生並設定 Android 平台檔
+2. Dart 格式處理
 3. Flutter 靜態分析
 4. Flutter 測試
 5. Android Debug APK 建置
@@ -41,8 +51,8 @@ Project Clover 是一款 Android 優先的優惠管理原型，協助使用者�
 ## Founder 取得 Android 試玩版
 
 1. 開啟 GitHub Pull Request
-2. 確認 `Flutter checks` 顯示綠色勾勾
-3. 進入該次 GitHub Actions 執行紀錄
-4. 在 Artifacts 點選 `project-clover-android-debug` 下載 ZIP
-5. 解壓縮後安裝 `app-debug.apk`
-6. 新增一筆優惠、關閉 App、再次開啟，確認資料仍存在
+2. 確認最新 `Flutter checks` 顯示綠色勾勾
+3. 下載最新 `project-clover-android-debug`
+4. 解壓縮後安裝 `app-debug.apk`
+5. 新增到期日在兩天後的優惠，並允許通知
+6. 確認優惠在重開 App 後仍存在
