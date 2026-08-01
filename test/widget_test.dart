@@ -49,6 +49,62 @@ void main() {
     expect(find.text('通知點擊測試'), findsOneWidget);
   });
 
+  testWidgets('active offer can be edited', (tester) async {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'edit-offer',
+          name: '編輯前名稱',
+          expiresAt: DateTime.now().add(const Duration(days: 10)),
+        ),
+      ],
+    );
+    await tester.pumpWidget(CloverApp(store: store));
+
+    await tester.tap(find.text('編輯前名稱'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('edit-offer-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('編輯優惠'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('offer-name-field')),
+      '編輯後名稱',
+    );
+    await tester.tap(find.byKey(const Key('save-offer-button')));
+    await tester.pumpAndSettle();
+
+    expect(store.activeOffers.single.name, '編輯後名稱');
+    expect(find.text('優惠已更新'), findsOneWidget);
+  });
+
+  testWidgets('deleting an offer requires confirmation', (tester) async {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'delete-offer',
+          name: '刪除測試',
+          expiresAt: DateTime.now().add(const Duration(days: 10)),
+        ),
+      ],
+    );
+    await tester.pumpWidget(CloverApp(store: store));
+
+    await tester.tap(find.text('刪除測試'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('delete-offer-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('刪除這張優惠？'), findsOneWidget);
+    expect(store.activeOffers, hasLength(1));
+
+    await tester.tap(find.byKey(const Key('confirm-delete-offer-button')));
+    await tester.pumpAndSettle();
+
+    expect(store.activeOffers, isEmpty);
+    expect(find.text('優惠已刪除'), findsOneWidget);
+  });
+
   testWidgets('offer can be marked completed', (tester) async {
     final store = OfferStore();
     await tester.pumpWidget(CloverApp(store: store));
