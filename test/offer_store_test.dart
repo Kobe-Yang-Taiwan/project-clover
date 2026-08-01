@@ -51,6 +51,20 @@ void main() {
     expect(reopenedAgain.completedOffers.single.id, savedId);
   });
 
+  test('legacy custom reminder migrates to nearest preset and keeps time', () {
+    final restored = Offer.fromJson({
+      'id': 'legacy',
+      'name': '舊版優惠',
+      'expiresAt': '2026-08-10T00:00:00.000',
+      'reminderAt': '2026-08-07T18:30:00.000',
+    });
+
+    expect(restored.reminderDaysBefore, 3);
+    expect(restored.reminderHour, 18);
+    expect(restored.reminderMinute, 30);
+    expect(restored.effectiveReminderAt, DateTime(2026, 8, 7, 18, 30));
+  });
+
   test('offer JSON keeps optional fields and completion status', () {
     final original = Offer(
       id: 'json-test',
@@ -59,7 +73,9 @@ void main() {
       source: '來源',
       note: '備註',
       reminderEnabled: true,
-      reminderAt: DateTime(2026, 7, 30, 18, 30),
+      reminderDaysBefore: 3,
+      reminderHour: 18,
+      reminderMinute: 30,
       status: OfferStatus.completed,
     );
 
@@ -71,7 +87,9 @@ void main() {
     expect(restored.source, original.source);
     expect(restored.note, original.note);
     expect(restored.reminderEnabled, isTrue);
-    expect(restored.reminderAt, DateTime(2026, 7, 30, 18, 30));
+    expect(restored.reminderDaysBefore, 3);
+    expect(restored.reminderHour, 18);
+    expect(restored.reminderMinute, 30);
     expect(restored.status, OfferStatus.completed);
   });
 }
