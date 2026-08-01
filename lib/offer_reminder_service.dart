@@ -6,6 +6,8 @@ import 'package:timezone/timezone.dart' as tz;
 import 'models/offer.dart';
 
 abstract interface class OfferReminderScheduler {
+  String? get initialOfferId;
+
   Future<bool> requestPermission();
 
   Future<void> sync(Iterable<Offer> activeOffers);
@@ -15,6 +17,9 @@ abstract interface class OfferReminderScheduler {
 
 class NoopOfferReminderScheduler implements OfferReminderScheduler {
   const NoopOfferReminderScheduler();
+
+  @override
+  String? get initialOfferId => null;
 
   @override
   Future<bool> requestPermission() async => false;
@@ -27,13 +32,16 @@ class NoopOfferReminderScheduler implements OfferReminderScheduler {
 }
 
 class AndroidOfferReminderScheduler implements OfferReminderScheduler {
-  AndroidOfferReminderScheduler._(this._notifications);
+  AndroidOfferReminderScheduler._(
+    this._notifications,
+    this.initialOfferId,
+  );
 
   static const _details = NotificationDetails(
     android: AndroidNotificationDetails(
       'offer_expiry_reminders',
       '優惠到期提醒',
-      channelDescription: '在優惠到期前一天提醒使用',
+      channelDescription: '依照選擇的提前天數與時間提醒使用',
       importance: Importance.high,
       priority: Priority.high,
     ),
@@ -41,7 +49,12 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler {
 
   final FlutterLocalNotificationsPlugin _notifications;
 
-  static Future<AndroidOfferReminderScheduler> create() async {
+  @override
+  final String? initialOfferId;
+
+  static Future<AndroidOfferReminderScheduler> create({
+    required void Function(String offerId) onOfferSelected,
+  }) async {
     tz_data.initializeTimeZones();
     final localTimezone = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(localTimezone.identifier));
@@ -51,8 +64,22 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler {
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       ),
+      onDidReceiveNotificationResponse: (response) {
+        final offerId = response.payload;
+        if (offerId != null && offerId.isNotEmpty) {
+          onOfferSelected(offerId);
+        }
+      },
     );
-    return AndroidOfferReminderScheduler._(notifications);
+    final launchDetails =
+        await notifications.getNotificationAppLaunchDetails();
+    final initialOfferId = launchDetails?.didNotificationLaunchApp ?? false
+        ? launchDetails?.notificationResponse?.payload
+        : null;
+    return AndroidOfferReminderScheduler._(
+      notifications,
+      initialOfferId,
+    );
   }
 
   @override
