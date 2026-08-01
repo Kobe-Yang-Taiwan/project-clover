@@ -3,14 +3,25 @@ import 'package:project_clover/models/offer.dart';
 import 'package:project_clover/offer_reminder_service.dart';
 
 void main() {
-  test('reminder is scheduled at 9 AM one day before expiry', () {
+  test('legacy offers default to 9 AM one day before expiry', () {
     final offer = Offer(
       id: 'reminder-test',
       name: '提醒測試',
       expiresAt: DateTime(2026, 8, 10),
     );
 
-    expect(reminderDateFor(offer), DateTime(2026, 8, 9, 9));
+    expect(offer.effectiveReminderAt, DateTime(2026, 8, 9, 9));
+  });
+
+  test('custom reminder date and time override the default', () {
+    final offer = Offer(
+      id: 'custom-reminder',
+      name: '自訂提醒',
+      expiresAt: DateTime(2026, 8, 10),
+      reminderAt: DateTime(2026, 8, 8, 18, 30),
+    );
+
+    expect(offer.effectiveReminderAt, DateTime(2026, 8, 8, 18, 30));
   });
 
   test('notification IDs are deterministic and distinct', () {
