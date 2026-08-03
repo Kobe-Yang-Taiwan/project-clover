@@ -488,18 +488,6 @@ class TodayScreen extends StatelessWidget {
       ],
     );
   }
-
-  void _openDetails(BuildContext context, Offer offer) {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => OfferDetailsScreen(
-          store: store,
-          reminders: reminders,
-          offerId: offer.id,
-        ),
-      ),
-    );
-  }
 }
 
 class _OfferSection extends StatelessWidget {
