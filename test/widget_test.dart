@@ -83,7 +83,7 @@ void main() {
       scrollable: find.descendant(
         of: find.byType(ListView),
         matching: find.byType(Scrollable),
-      ),
+      ).first,
     );
     await tester.drag(
       find.byType(ListView),
