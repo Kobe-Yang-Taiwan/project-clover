@@ -64,6 +64,8 @@ void main() {
     );
     await tester.pumpWidget(CloverApp(store: store));
 
+    await tester.tap(find.text('優惠清單'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('編輯前名稱'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('edit-offer-button')));
@@ -103,6 +105,8 @@ void main() {
     );
     await tester.pumpWidget(CloverApp(store: store));
 
+    await tester.tap(find.text('優惠清單'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('刪除測試'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('delete-offer-button')));
@@ -122,6 +126,8 @@ void main() {
     final store = OfferStore();
     await tester.pumpWidget(CloverApp(store: store));
 
+    await tester.tap(find.text('優惠清單'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('超商大杯拿鐵兌換券'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('complete-offer-button')));
