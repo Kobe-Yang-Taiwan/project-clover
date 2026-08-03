@@ -223,6 +223,208 @@ void main() {
     expect(restored.status, OfferStatus.completed);
     expect(restored.completedAt, DateTime(2026, 8, 1, 18, 45));
   });
+
+  test('search matches title, merchant and note without case sensitivity', () {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'title',
+          name: 'Coffee Coupon',
+          expiresAt: DateTime(2026, 8, 10),
+        ),
+        Offer(
+          id: 'merchant',
+          name: '午餐券',
+          source: 'STARBUCKS',
+          expiresAt: DateTime(2026, 8, 11),
+        ),
+        Offer(
+          id: 'note',
+          name: '電影券',
+          note: '週末 coffee date',
+          expiresAt: DateTime(2026, 8, 12),
+        ),
+      ],
+    );
+
+    expect(
+      store.queryOffers(query: 'CoFfEe').map((offer) => offer.id),
+      ['title', 'note'],
+    );
+    expect(store.queryOffers(query: 'starbucks').single.id, 'merchant');
+    expect(store.queryOffers(query: ''), hasLength(3));
+  });
+
+  test('filter combines with search and excludes completed time matches', () {
+    final now = DateTime(2026, 8, 3, 15);
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'today',
+          name: '咖啡今天',
+          expiresAt: DateTime(2026, 8, 3),
+        ),
+        Offer(
+          id: 'week',
+          name: '咖啡本週',
+          expiresAt: DateTime(2026, 8, 9),
+          reminderEnabled: false,
+        ),
+        Offer(
+          id: 'expired',
+          name: '過期咖啡',
+          expiresAt: DateTime(2026, 8, 2),
+        ),
+        Offer(
+          id: 'completed',
+          name: '咖啡已完成',
+          expiresAt: DateTime(2026, 8, 3),
+          status: OfferStatus.completed,
+        ),
+      ],
+    );
+
+    expect(
+      store
+          .queryOffers(
+            query: '咖啡',
+            filter: OfferFilter.expiringToday,
+            now: now,
+          )
+          .map((offer) => offer.id),
+      ['today'],
+    );
+    expect(
+      store
+          .queryOffers(filter: OfferFilter.expiringWithinSevenDays, now: now)
+          .map((offer) => offer.id),
+      ['today', 'week'],
+    );
+    expect(
+      store
+          .queryOffers(filter: OfferFilter.reminderDisabled, now: now)
+          .map((offer) => offer.id),
+      ['week'],
+    );
+    expect(
+      store.queryOffers(filter: OfferFilter.completed, now: now).single.id,
+      'completed',
+    );
+  });
+
+  test('all five sort options produce deterministic order', () {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'a',
+          name: 'A',
+          expiresAt: DateTime(2026, 8, 20),
+          createdAt: DateTime(2026, 8, 1),
+          updatedAt: DateTime(2026, 8, 2),
+        ),
+        Offer(
+          id: 'b',
+          name: 'B',
+          expiresAt: DateTime(2026, 8, 10),
+          createdAt: DateTime(2026, 8, 2),
+          updatedAt: DateTime(2026, 8, 3),
+        ),
+      ],
+    );
+
+    expect(
+      store
+          .queryOffers(sort: OfferSortOption.expirationAscending)
+          .map((offer) => offer.id),
+      ['b', 'a'],
+    );
+    expect(
+      store
+          .queryOffers(sort: OfferSortOption.expirationDescending)
+          .map((offer) => offer.id),
+      ['a', 'b'],
+    );
+    expect(
+      store
+          .queryOffers(sort: OfferSortOption.createdNewest)
+          .map((offer) => offer.id),
+      ['b', 'a'],
+    );
+    expect(
+      store
+          .queryOffers(sort: OfferSortOption.createdOldest)
+          .map((offer) => offer.id),
+      ['a', 'b'],
+    );
+    expect(
+      store
+          .queryOffers(sort: OfferSortOption.recentlyModified)
+          .map((offer) => offer.id),
+      ['b', 'a'],
+    );
+  });
+
+  test('selected sort option persists across store reloads', () async {
+    final offerStorage = MemoryOfferStorage();
+    final settings = MemoryOfferSettingsStorage();
+    final store = OfferStore(
+      initialOffers: [],
+      storage: offerStorage,
+      settingsStorage: settings,
+    );
+
+    await store.setSortOption(OfferSortOption.recentlyModified);
+    final reopened = await OfferStore.load(
+      storage: offerStorage,
+      settingsStorage: settings,
+    );
+
+    expect(reopened.sortOption, OfferSortOption.recentlyModified);
+  });
+
+  test('dashboard counts live data and selects next non-expired offer', () {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(id: 'old', name: '過期', expiresAt: DateTime(2026, 8, 2)),
+        Offer(id: 'today', name: '今天', expiresAt: DateTime(2026, 8, 3)),
+        Offer(id: 'three', name: '三天', expiresAt: DateTime(2026, 8, 6)),
+        Offer(id: 'seven', name: '七天', expiresAt: DateTime(2026, 8, 10)),
+        Offer(
+          id: 'done',
+          name: '完成',
+          expiresAt: DateTime(2026, 8, 3),
+          status: OfferStatus.completed,
+        ),
+      ],
+    );
+
+    final dashboard = store.dashboard(now: DateTime(2026, 8, 3, 23));
+
+    expect(dashboard.expiringToday, 1);
+    expect(dashboard.expiringWithinThreeDays, 2);
+    expect(dashboard.expiringWithinSevenDays, 3);
+    expect(dashboard.completed, 1);
+    expect(dashboard.total, 5);
+    expect(dashboard.nextExpiring?.id, 'today');
+  });
+
+  test('visual status follows date priority', () {
+    final now = DateTime(2026, 8, 3, 12);
+    Offer on(int day) => Offer(
+          id: '$day',
+          name: '$day',
+          expiresAt: DateTime(2026, 8, day),
+        );
+
+    expect(on(2).visualStatus(now: now), OfferVisualStatus.expired);
+    expect(on(3).visualStatus(now: now), OfferVisualStatus.expiringToday);
+    expect(on(4).visualStatus(now: now), OfferVisualStatus.expiringTomorrow);
+    expect(
+      on(6).visualStatus(now: now),
+      OfferVisualStatus.expiringWithinThreeDays,
+    );
+    expect(on(7).visualStatus(now: now), OfferVisualStatus.available);
+  });
 }
 
 class MemoryOfferStorage implements OfferStorage {
@@ -237,5 +439,17 @@ class MemoryOfferStorage implements OfferStorage {
   @override
   Future<void> saveOffers(List<Offer> offers) async {
     savedOffers = List<Offer>.from(offers);
+  }
+}
+
+class MemoryOfferSettingsStorage implements OfferSettingsStorage {
+  String? value;
+
+  @override
+  Future<String?> loadSortOption() async => value;
+
+  @override
+  Future<void> saveSortOption(String value) async {
+    this.value = value;
   }
 }

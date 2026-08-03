@@ -1,5 +1,13 @@
 enum OfferStatus { active, completed }
 
+enum OfferVisualStatus {
+  available,
+  expiringWithinThreeDays,
+  expiringTomorrow,
+  expiringToday,
+  expired,
+}
+
 class Offer {
   const Offer({
     required this.id,
@@ -13,6 +21,8 @@ class Offer {
     this.reminderMinute = 0,
     this.status = OfferStatus.active,
     this.completedAt,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory Offer.fromJson(Map<String, dynamic> json) {
@@ -54,6 +64,12 @@ class Offer {
       completedAt: json['completedAt'] == null
           ? null
           : DateTime.tryParse(json['completedAt'] as String),
+      createdAt: json['createdAt'] == null
+          ? null
+          : DateTime.tryParse(json['createdAt'] as String),
+      updatedAt: json['updatedAt'] == null
+          ? null
+          : DateTime.tryParse(json['updatedAt'] as String),
     );
   }
 
@@ -70,6 +86,8 @@ class Offer {
   final int reminderMinute;
   final OfferStatus status;
   final DateTime? completedAt;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   DateTime get effectiveReminderAt => DateTime(
         expiresAt.year,
@@ -80,6 +98,18 @@ class Offer {
       ).subtract(Duration(days: reminderDaysBefore));
 
   bool get isCompleted => status == OfferStatus.completed;
+
+  OfferVisualStatus visualStatus({DateTime? now}) {
+    final current = now ?? DateTime.now();
+    final today = DateTime(current.year, current.month, current.day);
+    final expiry = DateTime(expiresAt.year, expiresAt.month, expiresAt.day);
+    final days = expiry.difference(today).inDays;
+    if (days < 0) return OfferVisualStatus.expired;
+    if (days == 0) return OfferVisualStatus.expiringToday;
+    if (days == 1) return OfferVisualStatus.expiringTomorrow;
+    if (days <= 3) return OfferVisualStatus.expiringWithinThreeDays;
+    return OfferVisualStatus.available;
+  }
 
   Map<String, Object?> toJson() => {
         'id': id,
@@ -93,6 +123,8 @@ class Offer {
         'reminderMinute': reminderMinute,
         'status': status.name,
         'completedAt': completedAt?.toIso8601String(),
+        if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+        if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
       };
 
   Offer copyWith({
@@ -106,6 +138,8 @@ class Offer {
     int? reminderMinute,
     OfferStatus? status,
     DateTime? completedAt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
     bool clearCompletedAt = false,
   }) {
     return Offer(
@@ -122,6 +156,8 @@ class Offer {
       status: status ?? this.status,
       completedAt:
           clearCompletedAt ? null : completedAt ?? this.completedAt,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

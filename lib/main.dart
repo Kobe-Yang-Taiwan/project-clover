@@ -372,7 +372,8 @@ class TodayScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final offers = store.activeOffers;
+    final summary = store.dashboard();
+    final next = summary.nextExpiring;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 104),
       children: [
@@ -385,29 +386,62 @@ class TodayScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('先用快到期的', style: Theme.of(context).textTheme.titleLarge),
+              Text('優惠儀表板', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(
-                '未來 7 天有 ${store.expiringWithinDays(7)} 張優惠即將到期',
+                '未來 7 天有 ${summary.expiringWithinSevenDays} 張優惠即將到期',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        Text('依到期日排序', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
-        if (offers.isEmpty)
-          const _EmptyState(message: '目前沒有待使用的優惠')
-        else
-          ...offers.map(
-            (offer) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: OfferCard(
-                offer: offer,
-                onTap: () => _openDetails(context, offer),
-              ),
+        const SizedBox(height: 16),
+        GridView.count(
+          key: const Key('dashboard-metrics'),
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 2.25,
+          children: [
+            _DashboardMetric(
+              key: const Key('dashboard-today'),
+              label: '今天到期',
+              value: summary.expiringToday,
             ),
+            _DashboardMetric(
+              key: const Key('dashboard-three-days'),
+              label: '3 天內到期',
+              value: summary.expiringWithinThreeDays,
+            ),
+            _DashboardMetric(
+              key: const Key('dashboard-seven-days'),
+              label: '7 天內到期',
+              value: summary.expiringWithinSevenDays,
+            ),
+            _DashboardMetric(
+              key: const Key('dashboard-completed'),
+              label: '已完成',
+              value: summary.completed,
+            ),
+            _DashboardMetric(
+              key: const Key('dashboard-total'),
+              label: '全部優惠',
+              value: summary.total,
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Text('下一張到期優惠', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        if (next == null)
+          const _EmptyState(message: '目前沒有尚未到期的優惠')
+        else
+          OfferCard(
+            key: const Key('next-expiring-offer'),
+            offer: next,
+            onTap: () => _openDetails(context, next),
           ),
       ],
     );
@@ -426,7 +460,41 @@ class TodayScreen extends StatelessWidget {
   }
 }
 
-class OfferListScreen extends StatelessWidget {
+class _DashboardMetric extends StatelessWidget {
+  const _DashboardMetric({
+    required this.label,
+    required this.value,
+    super.key,
+  });
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            Text(
+              '$value',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(label)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class OfferListScreen extends StatefulWidget {
   const OfferListScreen({
     required this.store,
     required this.reminders,
@@ -437,53 +505,128 @@ class OfferListScreen extends StatelessWidget {
   final OfferReminderScheduler reminders;
 
   @override
+  State<OfferListScreen> createState() => _OfferListScreenState();
+}
+
+class _OfferListScreenState extends State<OfferListScreen> {
+  final searchController = TextEditingController();
+  OfferFilter filter = OfferFilter.all;
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final active = store.activeOffers;
-    final completed = store.completedOffers;
+    final offers = widget.store.queryOffers(
+      query: searchController.text,
+      filter: filter,
+    );
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 104),
       children: [
-        Text('待使用（${active.length}）', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
-        ...active.map(
-          (offer) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: OfferCard(
-              offer: offer,
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => OfferDetailsScreen(
-                    store: store,
-                    reminders: reminders,
-                    offerId: offer.id,
+        TextField(
+          key: const Key('offer-search-field'),
+          controller: searchController,
+          onChanged: (_) => setState(() {}),
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            labelText: '搜尋優惠',
+            hintText: '名稱、來源或備註',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    key: const Key('clear-search-button'),
+                    tooltip: '清除搜尋',
+                    onPressed: () {
+                      searchController.clear();
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.clear),
                   ),
-                ),
-              ),
-            ),
           ),
         ),
-        const SizedBox(height: 20),
-        Text('已完成（${completed.length}）', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
-        if (completed.isEmpty)
-          const _EmptyState(message: '完成優惠後會顯示在這裡')
-        else
-          ...completed.map(
-            (offer) => ListTile(
-              leading: const Icon(Icons.check_circle, color: Color(0xFF2E7D5B)),
-              title: Text(offer.name),
-              subtitle: Text(
-                offer.completedAt == null
-                    ? '已完成・到期日 ${formatTaiwanDate(offer.expiresAt)}'
-                    : '完成於 ${formatTaiwanDateTime(offer.completedAt!)}',
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<OfferFilter>(
+                key: const Key('offer-filter-field'),
+                initialValue: filter,
+                decoration: const InputDecoration(
+                  labelText: '篩選',
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                ),
+                items: OfferFilter.values
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(_filterLabel(value)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => filter = value);
+                },
               ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) => OfferDetailsScreen(
-                    store: store,
-                    reminders: reminders,
-                    offerId: offer.id,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: DropdownButtonFormField<OfferSortOption>(
+                key: const Key('offer-sort-field'),
+                initialValue: widget.store.sortOption,
+                decoration: const InputDecoration(
+                  labelText: '排序',
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                ),
+                items: OfferSortOption.values
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(_sortLabel(value)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) async {
+                  if (value == null) return;
+                  try {
+                    await widget.store.setSortOption(value);
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('無法儲存排序設定')),
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Text(
+          '找到 ${offers.length} 張優惠',
+          key: const Key('offer-result-count'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 12),
+        if (offers.isEmpty)
+          const _EmptyState(message: '沒有符合搜尋或篩選條件的優惠')
+        else
+          ...offers.map(
+            (offer) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: OfferCard(
+                offer: offer,
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(
+                    builder: (_) => OfferDetailsScreen(
+                      store: widget.store,
+                      reminders: widget.reminders,
+                      offerId: offer.id,
+                    ),
                   ),
                 ),
               ),
@@ -492,6 +635,24 @@ class OfferListScreen extends StatelessWidget {
       ],
     );
   }
+
+  String _filterLabel(OfferFilter value) => switch (value) {
+        OfferFilter.all => '全部',
+        OfferFilter.expiringToday => '今天到期',
+        OfferFilter.expiringWithinSevenDays => '7 天內到期',
+        OfferFilter.expired => '已過期',
+        OfferFilter.completed => '已完成',
+        OfferFilter.reminderEnabled => '提醒開啟',
+        OfferFilter.reminderDisabled => '提醒關閉',
+      };
+
+  String _sortLabel(OfferSortOption value) => switch (value) {
+        OfferSortOption.expirationAscending => '到期日近→遠',
+        OfferSortOption.expirationDescending => '到期日遠→近',
+        OfferSortOption.createdNewest => '最新建立',
+        OfferSortOption.createdOldest => '最早建立',
+        OfferSortOption.recentlyModified => '最近修改',
+      };
 }
 
 class AddOfferScreen extends StatefulWidget {

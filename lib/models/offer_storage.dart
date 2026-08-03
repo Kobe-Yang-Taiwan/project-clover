@@ -10,6 +10,27 @@ abstract interface class OfferStorage {
   Future<void> saveOffers(List<Offer> offers);
 }
 
+abstract interface class OfferSettingsStorage {
+  Future<String?> loadSortOption();
+
+  Future<void> saveSortOption(String value);
+}
+
+class SharedPreferencesOfferSettingsStorage implements OfferSettingsStorage {
+  SharedPreferencesOfferSettingsStorage({SharedPreferencesAsync? preferences})
+      : _preferences = preferences ?? SharedPreferencesAsync();
+
+  static const _sortKey = 'project_clover.sort_option.v1';
+  final SharedPreferencesAsync _preferences;
+
+  @override
+  Future<String?> loadSortOption() => _preferences.getString(_sortKey);
+
+  @override
+  Future<void> saveSortOption(String value) =>
+      _preferences.setString(_sortKey, value);
+}
+
 class SharedPreferencesOfferStorage implements OfferStorage {
   SharedPreferencesOfferStorage({SharedPreferencesAsync? preferences})
       : _preferences = preferences ?? SharedPreferencesAsync();

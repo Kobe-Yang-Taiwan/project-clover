@@ -14,14 +14,18 @@ class OfferCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final days = _daysUntil(offer.expiresAt);
-    final color = days <= 0
-        ? Theme.of(context).colorScheme.error
-        : days <= 3
-            ? const Color(0xFFB05A00)
-            : Theme.of(context).colorScheme.primary;
+    final status = offer.visualStatus();
+    final color = offer.isCompleted
+        ? const Color(0xFF4F6F64)
+        : _statusColor(context, status);
+    final label = offer.isCompleted ? '已完成' : _statusLabel(status);
 
     return Card(
+      color: color.withAlpha(12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: color.withAlpha(70)),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
@@ -52,9 +56,36 @@ class OfferCard extends StatelessWidget {
                       Text(offer.source),
                     ],
                     const SizedBox(height: 6),
-                    Text(
-                      '${_urgencyLabel(days)} · ${formatTaiwanDate(offer.expiresAt)}',
-                      style: TextStyle(color: color, fontWeight: FontWeight.w600),
+                    Wrap(
+                      spacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.withAlpha(30),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          formatTaiwanDate(offer.expiresAt),
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -67,18 +98,24 @@ class OfferCard extends StatelessWidget {
     );
   }
 
-  int _daysUntil(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final expiry = DateTime(date.year, date.month, date.day);
-    return expiry.difference(today).inDays;
+  Color _statusColor(BuildContext context, OfferVisualStatus status) {
+    return switch (status) {
+      OfferVisualStatus.available => Theme.of(context).colorScheme.primary,
+      OfferVisualStatus.expiringWithinThreeDays => const Color(0xFF9A6700),
+      OfferVisualStatus.expiringTomorrow => const Color(0xFFC25400),
+      OfferVisualStatus.expiringToday => Theme.of(context).colorScheme.error,
+      OfferVisualStatus.expired => const Color(0xFF6B6B6B),
+    };
   }
 
-  String _urgencyLabel(int days) {
-    if (days < 0) return '已過期';
-    if (days == 0) return '今天到期';
-    if (days == 1) return '明天到期';
-    return '剩下 $days 天';
+  String _statusLabel(OfferVisualStatus status) {
+    return switch (status) {
+      OfferVisualStatus.available => '可使用',
+      OfferVisualStatus.expiringWithinThreeDays => '3 天內到期',
+      OfferVisualStatus.expiringTomorrow => '明天到期',
+      OfferVisualStatus.expiringToday => '今天到期',
+      OfferVisualStatus.expired => '已過期',
+    };
   }
 }
 

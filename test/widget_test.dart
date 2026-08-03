@@ -231,6 +231,89 @@ void main() {
     expect(store.allOffers.single.id, 'from-backup');
     expect(find.text('已還原 1 筆優惠'), findsOneWidget);
   });
+
+  testWidgets('coupon search updates results immediately and can be cleared', (
+    tester,
+  ) async {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'coffee',
+          name: 'Coffee Coupon',
+          source: 'STARBUCKS',
+          expiresAt: DateTime.now().add(const Duration(days: 10)),
+        ),
+        Offer(
+          id: 'movie',
+          name: '電影票',
+          note: '週末約會',
+          expiresAt: DateTime.now().add(const Duration(days: 20)),
+        ),
+      ],
+    );
+    await tester.pumpWidget(CloverApp(store: store));
+    await tester.tap(find.text('優惠清單'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('offer-search-field')),
+      'starbucks',
+    );
+    await tester.pump();
+
+    expect(find.text('Coffee Coupon'), findsOneWidget);
+    expect(find.text('電影票'), findsNothing);
+    expect(find.text('找到 1 張優惠'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('clear-search-button')));
+    await tester.pump();
+
+    expect(find.text('Coffee Coupon'), findsOneWidget);
+    expect(find.text('電影票'), findsOneWidget);
+    expect(find.text('找到 2 張優惠'), findsOneWidget);
+  });
+
+  testWidgets('dashboard updates automatically after coupon status changes', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'today',
+          name: '今天使用',
+          expiresAt: DateTime(now.year, now.month, now.day),
+        ),
+      ],
+    );
+    await tester.pumpWidget(CloverApp(store: store));
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('dashboard-today')),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
+
+    await store.markCompleted('today');
+    await tester.pump();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('dashboard-today')),
+        matching: find.text('0'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('dashboard-completed')),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
+  });
 }
 
 class FakeBackupFileService implements OfferBackupFileService {
