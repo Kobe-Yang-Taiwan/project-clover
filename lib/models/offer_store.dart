@@ -22,6 +22,17 @@ enum OfferSortOption {
   recentlyModified,
 }
 
+enum ExpiredCleanupRange {
+  olderThan30Days(30),
+  olderThan90Days(90),
+  olderThanOneYear(365),
+  all(null);
+
+  const ExpiredCleanupRange(this.days);
+
+  final int? days;
+}
+
 class OfferDashboard {
   const OfferDashboard({
     required this.expiringToday,
@@ -59,29 +70,43 @@ class OfferStore extends ChangeNotifier {
     List<Offer>? initialOffers,
     OfferStorage? storage,
     OfferSettingsStorage? settingsStorage,
+    ReminderDefaultsStorage? reminderDefaultsStorage,
     OfferSortOption initialSortOption = OfferSortOption.expirationAscending,
+    ReminderDefaults initialReminderDefaults = const ReminderDefaults(),
   })  : _offers = List<Offer>.from(initialOffers ?? _demoOffers()),
         _storage = storage,
         _settingsStorage = settingsStorage,
-        _sortOption = initialSortOption;
+        _reminderDefaultsStorage = reminderDefaultsStorage,
+        _sortOption = initialSortOption,
+        _reminderDefaults = initialReminderDefaults;
 
   final List<Offer> _offers;
   final OfferStorage? _storage;
   final OfferSettingsStorage? _settingsStorage;
+  final ReminderDefaultsStorage? _reminderDefaultsStorage;
   OfferSortOption _sortOption;
+  ReminderDefaults _reminderDefaults;
 
   List<Offer> get allOffers => List<Offer>.unmodifiable(_offers);
   OfferSortOption get sortOption => _sortOption;
+  ReminderDefaults get reminderDefaults => _reminderDefaults;
 
   static Future<OfferStore> load({
     OfferStorage? storage,
     OfferSettingsStorage? settingsStorage,
+    ReminderDefaultsStorage? reminderDefaultsStorage,
   }) async {
     final persistence = storage ?? SharedPreferencesOfferStorage();
-    final settings = settingsStorage ??
-        (storage == null ? SharedPreferencesOfferSettingsStorage() : null);
+    final sharedSettings = storage == null
+        ? SharedPreferencesOfferSettingsStorage()
+        : null;
+    final settings = settingsStorage ?? sharedSettings;
+    final reminderSettings = reminderDefaultsStorage ?? sharedSettings;
     final savedOffers = await persistence.loadOffers();
     final storedSort = await settings?.loadSortOption();
+    final defaults =
+        await reminderSettings?.loadReminderDefaults() ??
+            const ReminderDefaults();
     final sortOption = OfferSortOption.values.firstWhere(
       (option) => option.name == storedSort,
       orElse: () => OfferSortOption.expirationAscending,
@@ -90,8 +115,24 @@ class OfferStore extends ChangeNotifier {
       initialOffers: savedOffers,
       storage: persistence,
       settingsStorage: settings,
+      reminderDefaultsStorage: reminderSettings,
       initialSortOption: sortOption,
+      initialReminderDefaults: defaults,
     );
+  }
+
+  Future<void> setReminderDefaults(ReminderDefaults value) async {
+    final normalized = value.copyWith();
+    final previous = _reminderDefaults;
+    _reminderDefaults = normalized;
+    notifyListeners();
+    try {
+      await _reminderDefaultsStorage?.saveReminderDefaults(normalized);
+    } catch (_) {
+      _reminderDefaults = previous;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   Future<void> setSortOption(OfferSortOption value) async {
@@ -254,10 +295,10 @@ class OfferStore extends ChangeNotifier {
     required DateTime expiresAt,
     String source = '',
     String note = '',
-    bool reminderEnabled = true,
-    int reminderDaysBefore = 1,
-    int reminderHour = 9,
-    int reminderMinute = 0,
+    bool? reminderEnabled,
+    int? reminderDaysBefore,
+    int? reminderHour,
+    int? reminderMinute,
     bool isFavorite = false,
     OfferCategory category = OfferCategory.others,
   }) async {
@@ -268,10 +309,12 @@ class OfferStore extends ChangeNotifier {
       expiresAt: expiresAt,
       source: source.trim(),
       note: note.trim(),
-      reminderEnabled: reminderEnabled,
-      reminderDaysBefore: normalizeReminderDays(reminderDaysBefore),
-      reminderHour: reminderHour,
-      reminderMinute: reminderMinute,
+      reminderEnabled: reminderEnabled ?? _reminderDefaults.enabled,
+      reminderDaysBefore: normalizeReminderDays(
+        reminderDaysBefore ?? _reminderDefaults.daysBefore,
+      ),
+      reminderHour: reminderHour ?? _reminderDefaults.hour,
+      reminderMinute: reminderMinute ?? _reminderDefaults.minute,
       createdAt: now,
       updatedAt: now,
       isFavorite: isFavorite,
@@ -347,6 +390,35 @@ class OfferStore extends ChangeNotifier {
   Future<void> deleteOffers(Set<String> ids) => _batchUpdate(
         (offers) => offers.removeWhere((offer) => ids.contains(offer.id)),
       );
+
+  List<Offer> expiredOffersForCleanup(
+    ExpiredCleanupRange range, {
+    DateTime? now,
+  }) {
+    final today = _dateOnly(now ?? DateTime.now());
+    return List<Offer>.unmodifiable(
+      _offers.where((offer) {
+        if (offer.isCompleted) return false;
+        final expiry = _dateOnly(offer.expiresAt);
+        final days = range.days;
+        return days == null
+            ? expiry.isBefore(today)
+            : expiry.isBefore(today.subtract(Duration(days: days)));
+      }),
+    );
+  }
+
+  Future<int> cleanupExpiredOffers(
+    ExpiredCleanupRange range, {
+    DateTime? now,
+  }) async {
+    final ids = expiredOffersForCleanup(range, now: now)
+        .map((offer) => offer.id)
+        .toSet();
+    if (ids.isEmpty) return 0;
+    await deleteOffers(ids);
+    return ids.length;
+  }
 
   Future<void> markOffersCompleted(
     Set<String> ids, {

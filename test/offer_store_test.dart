@@ -525,6 +525,93 @@ void main() {
     final reopened = await OfferStore.load(storage: storage);
     expect(reopened.allOffers.single.id, 'a');
   });
+
+  test('new coupons inherit persisted reminder defaults without changing existing coupons', () async {
+    final storage = MemoryOfferStorage();
+    final reminderSettings = MemoryReminderDefaultsStorage();
+    final existing = Offer(
+      id: 'existing',
+      name: '現有優惠',
+      expiresAt: DateTime(2026, 9, 30),
+      reminderEnabled: true,
+      reminderDaysBefore: 1,
+      reminderHour: 9,
+    );
+    final store = OfferStore(
+      initialOffers: [existing],
+      storage: storage,
+      reminderDefaultsStorage: reminderSettings,
+    );
+
+    await store.setReminderDefaults(
+      const ReminderDefaults(
+        enabled: false,
+        daysBefore: 7,
+        hour: 18,
+        minute: 30,
+      ),
+    );
+    await store.addOffer(name: '新優惠', expiresAt: DateTime(2026, 10, 31));
+
+    final unchanged = store.allOffers.firstWhere((offer) => offer.id == 'existing');
+    final added = store.allOffers.firstWhere((offer) => offer.name == '新優惠');
+    expect(unchanged.reminderEnabled, isTrue);
+    expect(unchanged.reminderDaysBefore, 1);
+    expect(unchanged.reminderHour, 9);
+    expect(added.reminderEnabled, isFalse);
+    expect(added.reminderDaysBefore, 7);
+    expect(added.reminderHour, 18);
+    expect(added.reminderMinute, 30);
+
+    final reopened = await OfferStore.load(
+      storage: storage,
+      reminderDefaultsStorage: reminderSettings,
+    );
+    expect(reopened.reminderDefaults.enabled, isFalse);
+    expect(reopened.reminderDefaults.daysBefore, 7);
+    expect(reopened.reminderDefaults.hour, 18);
+    expect(reopened.reminderDefaults.minute, 30);
+  });
+
+  test('expired cleanup uses strict age boundaries and keeps completed history', () async {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(id: '29', name: '29 天', expiresAt: DateTime(2026, 7, 5)),
+        Offer(id: '30', name: '30 天', expiresAt: DateTime(2026, 7, 4)),
+        Offer(id: '31', name: '31 天', expiresAt: DateTime(2026, 7, 3)),
+        Offer(id: '91', name: '91 天', expiresAt: DateTime(2026, 5, 4)),
+        Offer(
+          id: 'completed-old',
+          name: '已完成舊優惠',
+          expiresAt: DateTime(2025, 1, 1),
+          status: OfferStatus.completed,
+        ),
+      ],
+    );
+    final now = DateTime(2026, 8, 3, 23, 59);
+
+    expect(
+      store
+          .expiredOffersForCleanup(
+            ExpiredCleanupRange.olderThan30Days,
+            now: now,
+          )
+          .map((offer) => offer.id)
+          .toSet(),
+      {'31', '91'},
+    );
+    final deleted = await store.cleanupExpiredOffers(
+      ExpiredCleanupRange.olderThan30Days,
+      now: now,
+    );
+
+    expect(deleted, 2);
+    expect(store.allOffers.map((offer) => offer.id).toSet(), {
+      '29',
+      '30',
+      'completed-old',
+    });
+  });
 }
 
 class MemoryOfferStorage implements OfferStorage {
@@ -550,6 +637,18 @@ class MemoryOfferSettingsStorage implements OfferSettingsStorage {
 
   @override
   Future<void> saveSortOption(String value) async {
+    this.value = value;
+  }
+}
+
+class MemoryReminderDefaultsStorage implements ReminderDefaultsStorage {
+  ReminderDefaults? value;
+
+  @override
+  Future<ReminderDefaults?> loadReminderDefaults() async => value;
+
+  @override
+  Future<void> saveReminderDefaults(ReminderDefaults value) async {
     this.value = value;
   }
 }

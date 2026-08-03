@@ -49,14 +49,14 @@ class OfferCard extends StatelessWidget {
                 )
               else
                 Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(25),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(_categoryIcon(offer.category), color: color),
                 ),
-                child: Icon(Icons.confirmation_number_outlined, color: color),
-              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -143,6 +143,18 @@ class OfferCard extends StatelessWidget {
       OfferVisualStatus.expired => '已過期',
     };
   }
+
+  IconData _categoryIcon(OfferCategory category) => switch (category) {
+        OfferCategory.food => Icons.restaurant_outlined,
+        OfferCategory.coffee => Icons.local_cafe_outlined,
+        OfferCategory.convenienceStore => Icons.storefront_outlined,
+        OfferCategory.departmentStore => Icons.local_mall_outlined,
+        OfferCategory.onlineShopping => Icons.shopping_cart_outlined,
+        OfferCategory.entertainment => Icons.movie_outlined,
+        OfferCategory.travel => Icons.luggage_outlined,
+        OfferCategory.transportation => Icons.directions_bus_outlined,
+        OfferCategory.others => Icons.confirmation_number_outlined,
+      };
 }
 
 String formatTaiwanDate(DateTime date) =>

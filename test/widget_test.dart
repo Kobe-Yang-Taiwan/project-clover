@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:project_clover/beta_support.dart';
 import 'package:project_clover/main.dart';
 import 'package:project_clover/models/offer.dart';
 import 'package:project_clover/models/offer_backup.dart';
 import 'package:project_clover/models/offer_store.dart';
 import 'package:project_clover/offer_backup_file_service.dart';
+import 'package:project_clover/offer_reminder_service.dart';
 
 void main() {
   testWidgets('founder can open the add-offer flow', (tester) async {
@@ -323,6 +325,81 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('beta support opens feedback and exports diagnostic information', (
+    tester,
+  ) async {
+    final provider = FakeDiagnosticInfoProvider();
+    final feedback = FakeFeedbackLauncher();
+    final exporter = FakeDiagnosticExportService();
+    await tester.pumpWidget(
+      CloverApp(
+        store: OfferStore(initialOffers: []),
+        diagnosticInfoProvider: provider,
+        feedbackLauncher: feedback,
+        diagnosticExportService: exporter,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -650));
+    await tester.pumpAndSettle();
+    final sendFeedback = find.byKey(const Key('send-feedback-button'));
+    await tester.ensureVisible(sendFeedback);
+    await tester.tap(sendFeedback);
+    await tester.pumpAndSettle();
+
+    expect(feedback.openedInfo, same(provider.info));
+    expect(provider.collectCount, 1);
+
+    final exportDiagnostic = find.byKey(const Key('export-diagnostic-button'));
+    await tester.ensureVisible(exportDiagnostic);
+    await tester.tap(exportDiagnostic);
+    await tester.pumpAndSettle();
+
+    expect(exporter.exportedInfo, same(provider.info));
+    expect(provider.collectCount, 2);
+    expect(find.text('診斷資訊已匯出'), findsOneWidget);
+  });
+
+  testWidgets('expired cleanup requires confirmation before deleting', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final oldOffer = Offer(
+      id: 'old-expired',
+      name: '很久以前的優惠',
+      expiresAt: DateTime(now.year, now.month, now.day)
+          .subtract(const Duration(days: 31)),
+    );
+    final store = OfferStore(initialOffers: [oldOffer]);
+    await tester.pumpWidget(CloverApp(store: store));
+
+    await tester.tap(find.byKey(const Key('settings-button')));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -350));
+    await tester.pumpAndSettle();
+    final cleanupButton = find.byKey(const Key('expired-cleanup-button'));
+    await tester.ensureVisible(cleanupButton);
+    await tester.tap(cleanupButton);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('cleanup-olderThan30Days')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('刪除 1 張過期優惠？'), findsOneWidget);
+    expect(store.allOffers, hasLength(1));
+
+    await tester.tap(
+      find.byKey(const Key('confirm-expired-cleanup-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(store.allOffers, isEmpty);
+    expect(find.text('已刪除 1 張過期優惠'), findsOneWidget);
+  });
 }
 
 class FakeBackupFileService implements OfferBackupFileService {
@@ -342,6 +419,43 @@ class FakeBackupFileService implements OfferBackupFileService {
   }) async {
     exportedName = fileName;
     exportedContent = content;
+    return true;
+  }
+}
+
+class FakeDiagnosticInfoProvider implements DiagnosticInfoProvider {
+  final DiagnosticInfo info = const DiagnosticInfo(
+    appVersion: '0.11.0',
+    buildNumber: '11',
+    androidVersion: '16 (SDK 36)',
+    deviceInformation: 'Test Phone',
+    notificationPermission: NotificationPermissionState.granted,
+  );
+  int collectCount = 0;
+
+  @override
+  Future<DiagnosticInfo> collect(OfferReminderScheduler reminders) async {
+    collectCount++;
+    return info;
+  }
+}
+
+class FakeFeedbackLauncher implements FeedbackLauncher {
+  DiagnosticInfo? openedInfo;
+
+  @override
+  Future<bool> open(DiagnosticInfo info) async {
+    openedInfo = info;
+    return true;
+  }
+}
+
+class FakeDiagnosticExportService implements DiagnosticExportService {
+  DiagnosticInfo? exportedInfo;
+
+  @override
+  Future<bool> export(DiagnosticInfo info) async {
+    exportedInfo = info;
     return true;
   }
 }

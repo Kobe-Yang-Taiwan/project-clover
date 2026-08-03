@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'beta_support.dart';
 import 'models/offer.dart';
 import 'models/offer_backup.dart';
+import 'models/offer_storage.dart';
 import 'models/offer_store.dart';
 import 'offer_backup_file_service.dart';
 import 'offer_reminder_service.dart';
@@ -54,6 +56,9 @@ class CloverApp extends StatefulWidget {
     this.navigatorKey,
     this.initialOfferId,
     this.backupFiles,
+    this.diagnosticInfoProvider,
+    this.diagnosticExportService,
+    this.feedbackLauncher,
   });
 
   final OfferStore? store;
@@ -61,6 +66,9 @@ class CloverApp extends StatefulWidget {
   final GlobalKey<NavigatorState>? navigatorKey;
   final String? initialOfferId;
   final OfferBackupFileService? backupFiles;
+  final DiagnosticInfoProvider? diagnosticInfoProvider;
+  final DiagnosticExportService? diagnosticExportService;
+  final FeedbackLauncher? feedbackLauncher;
 
   @override
   State<CloverApp> createState() => _CloverAppState();
@@ -70,6 +78,12 @@ class _CloverAppState extends State<CloverApp> {
   late final OfferStore store = widget.store ?? OfferStore();
   late final OfferBackupFileService backupFiles =
       widget.backupFiles ?? FilePickerOfferBackupFileService();
+  late final DiagnosticInfoProvider diagnosticInfoProvider =
+      widget.diagnosticInfoProvider ?? AndroidDiagnosticInfoProvider();
+  late final DiagnosticExportService diagnosticExportService =
+      widget.diagnosticExportService ?? FilePickerDiagnosticExportService();
+  late final FeedbackLauncher feedbackLauncher =
+      widget.feedbackLauncher ?? EmailFeedbackLauncher();
 
   @override
   void initState() {
@@ -114,6 +128,9 @@ class _CloverAppState extends State<CloverApp> {
         store: store,
         reminders: widget.reminders,
         backupFiles: backupFiles,
+        diagnosticInfoProvider: diagnosticInfoProvider,
+        diagnosticExportService: diagnosticExportService,
+        feedbackLauncher: feedbackLauncher,
       ),
     );
   }
@@ -124,12 +141,18 @@ class CloverHome extends StatefulWidget {
     required this.store,
     required this.reminders,
     required this.backupFiles,
+    required this.diagnosticInfoProvider,
+    required this.diagnosticExportService,
+    required this.feedbackLauncher,
     super.key,
   });
 
   final OfferStore store;
   final OfferReminderScheduler reminders;
   final OfferBackupFileService backupFiles;
+  final DiagnosticInfoProvider diagnosticInfoProvider;
+  final DiagnosticExportService diagnosticExportService;
+  final FeedbackLauncher feedbackLauncher;
 
   @override
   State<CloverHome> createState() => _CloverHomeState();
@@ -152,6 +175,12 @@ class _CloverHomeState extends State<CloverHome> {
                 tooltip: '資料備份與還原',
                 onPressed: _showBackupOptions,
                 icon: const Icon(Icons.save_alt),
+              ),
+              IconButton(
+                key: const Key('settings-button'),
+                tooltip: 'Beta 測試設定',
+                onPressed: _openSettings,
+                icon: const Icon(Icons.settings_outlined),
               ),
               IconButton(
                 key: const Key('app-info-button'),
@@ -224,6 +253,20 @@ class _CloverHomeState extends State<CloverHome> {
         const SnackBar(content: Text('目前無法讀取軟體版本')),
       );
     }
+  }
+
+  Future<void> _openSettings() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => BetaSettingsScreen(
+          store: widget.store,
+          reminders: widget.reminders,
+          diagnosticInfoProvider: widget.diagnosticInfoProvider,
+          diagnosticExportService: widget.diagnosticExportService,
+          feedbackLauncher: widget.feedbackLauncher,
+        ),
+      ),
+    );
   }
 
   Future<void> _showBackupOptions() async {
@@ -356,6 +399,360 @@ class _CloverHomeState extends State<CloverHome> {
           store: widget.store,
           reminders: widget.reminders,
         ),
+      ),
+    );
+  }
+}
+
+class BetaSettingsScreen extends StatefulWidget {
+  const BetaSettingsScreen({
+    required this.store,
+    required this.reminders,
+    required this.diagnosticInfoProvider,
+    required this.diagnosticExportService,
+    required this.feedbackLauncher,
+    super.key,
+  });
+
+  final OfferStore store;
+  final OfferReminderScheduler reminders;
+  final DiagnosticInfoProvider diagnosticInfoProvider;
+  final DiagnosticExportService diagnosticExportService;
+  final FeedbackLauncher feedbackLauncher;
+
+  @override
+  State<BetaSettingsScreen> createState() => _BetaSettingsScreenState();
+}
+
+class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
+  late bool reminderEnabled;
+  late int reminderDaysBefore;
+  late TimeOfDay reminderTime;
+  bool isBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final defaults = widget.store.reminderDefaults;
+    reminderEnabled = defaults.enabled;
+    reminderDaysBefore = defaults.daysBefore;
+    reminderTime = TimeOfDay(hour: defaults.hour, minute: defaults.minute);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Beta 測試設定')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+        children: [
+          const _SettingsSectionHeader(
+            icon: Icons.notifications_outlined,
+            title: '新增優惠的提醒預設',
+            description: '只套用到之後新增的優惠，現有優惠不會改變。',
+          ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                children: [
+                  SwitchListTile.adaptive(
+                    key: const Key('default-reminder-switch'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('預設開啟到期提醒'),
+                    value: reminderEnabled,
+                    onChanged: (value) =>
+                        setState(() => reminderEnabled = value),
+                  ),
+                  if (reminderEnabled) ...[
+                    DropdownButtonFormField<int>(
+                      key: const Key('default-reminder-days-field'),
+                      initialValue: reminderDaysBefore,
+                      decoration: const InputDecoration(labelText: '預設提前提醒'),
+                      items: Offer.supportedReminderDays
+                          .map(
+                            (days) => DropdownMenuItem(
+                              value: days,
+                              child: Text('$days 天前'),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => reminderDaysBefore = value);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      key: const Key('default-reminder-time-field'),
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('預設提醒時間'),
+                      subtitle: Text(formatTaiwanTime(reminderTime)),
+                      trailing: const Icon(Icons.schedule_outlined),
+                      onTap: _selectReminderTime,
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      key: const Key('save-default-reminder-button'),
+                      onPressed: isBusy ? null : _saveReminderDefaults,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('儲存提醒預設'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const _SettingsSectionHeader(
+            icon: Icons.cleaning_services_outlined,
+            title: '過期優惠整理',
+            description: '只清理已過期且仍為待使用的優惠。',
+          ),
+          Card(
+            child: ListTile(
+              key: const Key('expired-cleanup-button'),
+              leading: const Icon(Icons.delete_sweep_outlined),
+              title: const Text('清理過期優惠'),
+              subtitle: const Text('可選 30 天、90 天、1 年以前或全部'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: isBusy ? null : _chooseCleanupRange,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const _SettingsSectionHeader(
+            icon: Icons.bug_report_outlined,
+            title: 'Beta 回饋與支援',
+            description: '診斷檔不包含優惠內容，寄出前仍由你確認。',
+          ),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  key: const Key('send-feedback-button'),
+                  leading: const Icon(Icons.mail_outline),
+                  title: const Text('Send Feedback｜傳送回饋'),
+                  subtitle: const Text('開啟 Email，附上版本與裝置資訊'),
+                  trailing: const Icon(Icons.open_in_new),
+                  onTap: isBusy ? null : _sendFeedback,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  key: const Key('export-diagnostic-button'),
+                  leading: const Icon(Icons.description_outlined),
+                  title: const Text('Export Diagnostic Information'),
+                  subtitle: const Text('匯出 JSON，方便分享給 Founder'),
+                  trailing: const Icon(Icons.download_outlined),
+                  onTap: isBusy ? null : _exportDiagnostic,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectReminderTime() async {
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: reminderTime,
+      helpText: '選擇預設提醒時間',
+    );
+    if (selected != null) setState(() => reminderTime = selected);
+  }
+
+  Future<void> _saveReminderDefaults() async {
+    setState(() => isBusy = true);
+    try {
+      await widget.store.setReminderDefaults(
+        ReminderDefaults(
+          enabled: reminderEnabled,
+          daysBefore: reminderDaysBefore,
+          hour: reminderTime.hour,
+          minute: reminderTime.minute,
+        ),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已儲存；現有優惠維持原設定')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('無法儲存提醒預設')),
+      );
+    } finally {
+      if (mounted) setState(() => isBusy = false);
+    }
+  }
+
+  Future<void> _chooseCleanupRange() async {
+    final range = await showModalBottomSheet<ExpiredCleanupRange>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: ExpiredCleanupRange.values
+                .map(
+                  (value) => ListTile(
+                    key: Key('cleanup-${value.name}'),
+                    title: Text(_cleanupLabel(value)),
+                    trailing: Text(
+                      '${widget.store.expiredOffersForCleanup(value).length} 張',
+                    ),
+                    onTap: () => Navigator.of(sheetContext).pop(value),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ),
+    );
+    if (!mounted || range == null) return;
+    final count = widget.store.expiredOffersForCleanup(range).length;
+    if (count == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('沒有符合條件的過期優惠')),
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('刪除 $count 張過期優惠？'),
+        content: Text('${_cleanupLabel(range)}。刪除後無法復原。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            key: const Key('confirm-expired-cleanup-button'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('確認刪除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _cleanup(range);
+  }
+
+  Future<void> _cleanup(ExpiredCleanupRange range) async {
+    setState(() => isBusy = true);
+    try {
+      final count = await widget.store.cleanupExpiredOffers(range);
+      var reminderSynced = true;
+      try {
+        await widget.reminders.sync(widget.store.activeOffers);
+      } catch (_) {
+        reminderSynced = false;
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            reminderSynced
+                ? '已刪除 $count 張過期優惠'
+                : '已刪除 $count 張優惠，但提醒同步失敗',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('清理失敗，資料未變更')),
+      );
+    } finally {
+      if (mounted) setState(() => isBusy = false);
+    }
+  }
+
+  Future<void> _sendFeedback() async {
+    setState(() => isBusy = true);
+    try {
+      final info = await widget.diagnosticInfoProvider.collect(widget.reminders);
+      final opened = await widget.feedbackLauncher.open(info);
+      if (!mounted || opened) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('找不到可用的 Email App')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('目前無法開啟回饋 Email')),
+      );
+    } finally {
+      if (mounted) setState(() => isBusy = false);
+    }
+  }
+
+  Future<void> _exportDiagnostic() async {
+    setState(() => isBusy = true);
+    try {
+      final info = await widget.diagnosticInfoProvider.collect(widget.reminders);
+      final exported = await widget.diagnosticExportService.export(info);
+      if (!mounted || !exported) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('診斷資訊已匯出')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('診斷資訊匯出失敗')),
+      );
+    } finally {
+      if (mounted) setState(() => isBusy = false);
+    }
+  }
+
+  String _cleanupLabel(ExpiredCleanupRange value) => switch (value) {
+        ExpiredCleanupRange.olderThan30Days => '刪除超過 30 天的過期優惠',
+        ExpiredCleanupRange.olderThan90Days => '刪除超過 90 天的過期優惠',
+        ExpiredCleanupRange.olderThanOneYear => '刪除超過 1 年的過期優惠',
+        ExpiredCleanupRange.all => '刪除全部過期優惠',
+      };
+}
+
+class _SettingsSectionHeader extends StatelessWidget {
+  const _SettingsSectionHeader({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(description, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -986,7 +1383,13 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
   void initState() {
     super.initState();
     final offer = widget.offer;
-    if (offer == null) return;
+    if (offer == null) {
+      final defaults = widget.store.reminderDefaults;
+      reminderEnabled = defaults.enabled;
+      reminderDaysBefore = defaults.daysBefore;
+      reminderTime = TimeOfDay(hour: defaults.hour, minute: defaults.minute);
+      return;
+    }
 
     nameController.text = offer.name;
     sourceController.text = offer.source;
@@ -1514,13 +1917,33 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 32),
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer.withAlpha(90),
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Column(
         children: [
-          Icon(Icons.eco_outlined, size: 48, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 12),
-          Text(message),
+          Icon(
+            Icons.search_off_outlined,
+            size: 52,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '調整搜尋字詞或篩選條件後再試一次。',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );

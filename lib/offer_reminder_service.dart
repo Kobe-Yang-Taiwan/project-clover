@@ -5,10 +5,14 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'models/offer.dart';
 
+enum NotificationPermissionState { granted, denied, unknown }
+
 abstract interface class OfferReminderScheduler {
   String? get initialOfferId;
 
   Future<bool> requestPermission();
+
+  Future<NotificationPermissionState> permissionState();
 
   Future<void> sync(Iterable<Offer> activeOffers);
 
@@ -23,6 +27,10 @@ class NoopOfferReminderScheduler implements OfferReminderScheduler {
 
   @override
   Future<bool> requestPermission() async => false;
+
+  @override
+  Future<NotificationPermissionState> permissionState() async =>
+      NotificationPermissionState.unknown;
 
   @override
   Future<void> sync(Iterable<Offer> activeOffers) async {}
@@ -90,6 +98,18 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler {
   }
 
   @override
+  Future<NotificationPermissionState> permissionState() async {
+    final android = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    final enabled = await android?.areNotificationsEnabled();
+    return switch (enabled) {
+      true => NotificationPermissionState.granted,
+      false => NotificationPermissionState.denied,
+      null => NotificationPermissionState.unknown,
+    };
+  }
+
+  @override
   Future<void> sync(Iterable<Offer> activeOffers) async {
     await _notifications.cancelAll();
     final now = tz.TZDateTime.now(tz.local);
@@ -126,7 +146,6 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler {
     return _notifications.cancel(id: notificationIdFor(offerId));
   }
 }
-
 
 int notificationIdFor(String offerId) {
   var hash = 0x811C9DC5;
