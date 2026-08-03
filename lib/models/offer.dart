@@ -1,5 +1,17 @@
 enum OfferStatus { active, completed }
 
+enum OfferCategory {
+  food,
+  coffee,
+  convenienceStore,
+  departmentStore,
+  onlineShopping,
+  entertainment,
+  travel,
+  transportation,
+  others,
+}
+
 enum OfferVisualStatus {
   available,
   expiringWithinThreeDays,
@@ -23,6 +35,8 @@ class Offer {
     this.completedAt,
     this.createdAt,
     this.updatedAt,
+    this.isFavorite = false,
+    this.category = OfferCategory.others,
   });
 
   factory Offer.fromJson(Map<String, dynamic> json) {
@@ -70,6 +84,11 @@ class Offer {
       updatedAt: json['updatedAt'] == null
           ? null
           : DateTime.tryParse(json['updatedAt'] as String),
+      isFavorite: json['isFavorite'] as bool? ?? false,
+      category: OfferCategory.values.firstWhere(
+        (category) => category.name == json['category'],
+        orElse: () => OfferCategory.others,
+      ),
     );
   }
 
@@ -88,6 +107,8 @@ class Offer {
   final DateTime? completedAt;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final bool isFavorite;
+  final OfferCategory category;
 
   DateTime get effectiveReminderAt => DateTime(
         expiresAt.year,
@@ -125,6 +146,8 @@ class Offer {
         'completedAt': completedAt?.toIso8601String(),
         if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
         if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+        'isFavorite': isFavorite,
+        'category': category.name,
       };
 
   Offer copyWith({
@@ -140,6 +163,8 @@ class Offer {
     DateTime? completedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isFavorite,
+    OfferCategory? category,
     bool clearCompletedAt = false,
   }) {
     return Offer(
@@ -158,6 +183,8 @@ class Offer {
           clearCompletedAt ? null : completedAt ?? this.completedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isFavorite: isFavorite ?? this.isFavorite,
+      category: category ?? this.category,
     );
   }
 }

@@ -6,11 +6,19 @@ class OfferCard extends StatelessWidget {
   const OfferCard({
     required this.offer,
     required this.onTap,
+    this.onLongPress,
+    this.onFavorite,
+    this.selectionMode = false,
+    this.isSelected = false,
     super.key,
   });
 
   final Offer offer;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onFavorite;
+  final bool selectionMode;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -29,11 +37,18 @@ class OfferCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Container(
+              if (selectionMode)
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (_) => onTap(),
+                )
+              else
+                Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
@@ -90,7 +105,18 @@ class OfferCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              if (!selectionMode && onFavorite != null)
+                IconButton(
+                  key: Key('favorite-${offer.id}'),
+                  tooltip: offer.isFavorite ? '取消收藏' : '加入收藏',
+                  onPressed: onFavorite,
+                  icon: Icon(
+                    offer.isFavorite ? Icons.star : Icons.star_border,
+                    color: offer.isFavorite ? const Color(0xFFE09F00) : null,
+                  ),
+                )
+              else if (!selectionMode)
+                const Icon(Icons.chevron_right),
             ],
           ),
         ),

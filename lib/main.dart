@@ -165,6 +165,7 @@ class _CloverHomeState extends State<CloverHome> {
               ? TodayScreen(
                   store: widget.store,
                   reminders: widget.reminders,
+                  onAddOffer: () => _openAddOffer(context),
                 )
               : OfferListScreen(
                   store: widget.store,
@@ -364,16 +365,25 @@ class TodayScreen extends StatelessWidget {
   const TodayScreen({
     required this.store,
     required this.reminders,
+    required this.onAddOffer,
     super.key,
   });
 
   final OfferStore store;
   final OfferReminderScheduler reminders;
+  final VoidCallback onAddOffer;
 
   @override
   Widget build(BuildContext context) {
     final summary = store.dashboard();
-    final next = summary.nextExpiring;
+    final myDay = store.myDay();
+    final favorites = store.allOffers
+        .where((offer) => offer.isFavorite && !offer.isCompleted)
+        .toList()
+      ..sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
+    if (store.allOffers.isEmpty) {
+      return _FirstExperience(onAddOffer: onAddOffer);
+    }
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 104),
       children: [
@@ -386,16 +396,59 @@ class TodayScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('優惠儀表板', style: Theme.of(context).textTheme.titleLarge),
+              Text('My Day｜我的今天', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(
-                '未來 7 天有 ${summary.expiringWithinSevenDays} 張優惠即將到期',
+                myDay.recommendedToday == null
+                    ? '今天沒有急著要用的優惠'
+                    : '5 秒找到今天最值得先用的優惠',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
+        _OfferSection(
+          title: '今日推薦',
+          emptyMessage: '今天沒有推薦項目',
+          offers: myDay.recommendedToday == null
+              ? const []
+              : [myDay.recommendedToday!],
+          store: store,
+          reminders: reminders,
+          cardKey: const Key('next-expiring-offer'),
+        ),
+        _OfferSection(
+          title: '今天到期',
+          emptyMessage: '今天沒有到期優惠',
+          offers: myDay.expiringToday,
+          store: store,
+          reminders: reminders,
+        ),
+        _OfferSection(
+          title: '明天到期',
+          emptyMessage: '明天沒有到期優惠',
+          offers: myDay.expiringTomorrow,
+          store: store,
+          reminders: reminders,
+        ),
+        _OfferSection(
+          title: '本週必用',
+          emptyMessage: '未來 2～7 天沒有到期優惠',
+          offers: myDay.mustUseThisWeek,
+          store: store,
+          reminders: reminders,
+        ),
+        _OfferSection(
+          title: '我的收藏',
+          emptyMessage: '尚未收藏優惠',
+          offers: favorites,
+          store: store,
+          reminders: reminders,
+        ),
+        const SizedBox(height: 8),
+        Text('優惠總覽', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
         GridView.count(
           key: const Key('dashboard-metrics'),
           crossAxisCount: 2,
@@ -432,17 +485,6 @@ class TodayScreen extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 24),
-        Text('下一張到期優惠', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
-        if (next == null)
-          const _EmptyState(message: '目前沒有尚未到期的優惠')
-        else
-          OfferCard(
-            key: const Key('next-expiring-offer'),
-            offer: next,
-            onTap: () => _openDetails(context, next),
-          ),
       ],
     );
   }
@@ -454,6 +496,99 @@ class TodayScreen extends StatelessWidget {
           store: store,
           reminders: reminders,
           offerId: offer.id,
+        ),
+      ),
+    );
+  }
+}
+
+class _OfferSection extends StatelessWidget {
+  const _OfferSection({
+    required this.title,
+    required this.emptyMessage,
+    required this.offers,
+    required this.store,
+    required this.reminders,
+    this.cardKey,
+  });
+
+  final String title;
+  final String emptyMessage;
+  final List<Offer> offers;
+  final OfferStore store;
+  final OfferReminderScheduler reminders;
+  final Key? cardKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          if (offers.isEmpty)
+            Text(emptyMessage, style: Theme.of(context).textTheme.bodySmall)
+          else
+            ...offers.take(5).map(
+                  (offer) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: OfferCard(
+                      key: offer == offers.first ? cardKey : null,
+                      offer: offer,
+                      onFavorite: () => store.toggleFavorite(offer.id),
+                      onTap: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) => OfferDetailsScreen(
+                            store: store,
+                            reminders: reminders,
+                            offerId: offer.id,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FirstExperience extends StatelessWidget {
+  const _FirstExperience({required this.onAddOffer});
+
+  final VoidCallback onAddOffer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.eco_outlined,
+              size: 88,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 20),
+            Text('別讓優惠悄悄過期', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 12),
+            const Text(
+              '加入第一張優惠，Project Clover 會每天告訴你該先用哪一張。',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              key: const Key('add-first-offer-button'),
+              onPressed: onAddOffer,
+              icon: const Icon(Icons.add),
+              label: const Text('新增第一張優惠'),
+            ),
+          ],
         ),
       ),
     );
@@ -511,6 +646,11 @@ class OfferListScreen extends StatefulWidget {
 class _OfferListScreenState extends State<OfferListScreen> {
   final searchController = TextEditingController();
   OfferFilter filter = OfferFilter.all;
+  OfferCategory? category;
+  final Set<String> selectedIds = {};
+  bool selectionMode = false;
+
+  bool get isSelecting => selectionMode;
 
   @override
   void dispose() {
@@ -523,6 +663,7 @@ class _OfferListScreenState extends State<OfferListScreen> {
     final offers = widget.store.queryOffers(
       query: searchController.text,
       filter: filter,
+      category: category,
     );
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 104),
@@ -605,6 +746,50 @@ class _OfferListScreenState extends State<OfferListScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<OfferCategory?>(
+                key: const Key('offer-category-filter-field'),
+                initialValue: category,
+                decoration: const InputDecoration(
+                  labelText: '分類',
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                ),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('全部分類')),
+                  ...OfferCategory.values.map(
+                    (value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(offerCategoryLabel(value)),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setState(() => category = value),
+              ),
+            ),
+            const SizedBox(width: 10),
+            OutlinedButton.icon(
+              key: const Key('batch-select-button'),
+              onPressed: () => setState(() {
+                selectionMode = !selectionMode;
+                if (!selectionMode) selectedIds.clear();
+              }),
+              icon: Icon(isSelecting ? Icons.close : Icons.checklist),
+              label: Text(isSelecting ? '取消選取' : '批次操作'),
+            ),
+          ],
+        ),
+        if (isSelecting) ...[
+          const SizedBox(height: 10),
+          _BatchToolbar(
+            count: selectedIds.length,
+            onDelete: () => _runBatch(_BatchAction.delete),
+            onComplete: () => _runBatch(_BatchAction.complete),
+            onRestore: () => _runBatch(_BatchAction.restore),
+          ),
+        ],
         const SizedBox(height: 20),
         Text(
           '找到 ${offers.length} 張優惠',
@@ -620,15 +805,25 @@ class _OfferListScreenState extends State<OfferListScreen> {
               padding: const EdgeInsets.only(bottom: 12),
               child: OfferCard(
                 offer: offer,
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(
-                    builder: (_) => OfferDetailsScreen(
-                      store: widget.store,
-                      reminders: widget.reminders,
-                      offerId: offer.id,
+                selectionMode: isSelecting,
+                isSelected: selectedIds.contains(offer.id),
+                onFavorite: () => widget.store.toggleFavorite(offer.id),
+                onLongPress: () => _toggleSelected(offer.id),
+                onTap: () {
+                  if (isSelecting) {
+                    _toggleSelected(offer.id);
+                    return;
+                  }
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => OfferDetailsScreen(
+                        store: widget.store,
+                        reminders: widget.reminders,
+                        offerId: offer.id,
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ),
@@ -644,6 +839,7 @@ class _OfferListScreenState extends State<OfferListScreen> {
         OfferFilter.completed => '已完成',
         OfferFilter.reminderEnabled => '提醒開啟',
         OfferFilter.reminderDisabled => '提醒關閉',
+        OfferFilter.favorites => '我的收藏',
       };
 
   String _sortLabel(OfferSortOption value) => switch (value) {
@@ -653,6 +849,120 @@ class _OfferListScreenState extends State<OfferListScreen> {
         OfferSortOption.createdOldest => '最早建立',
         OfferSortOption.recentlyModified => '最近修改',
       };
+
+  void _toggleSelected(String id) {
+    setState(() {
+      selectionMode = true;
+      if (!selectedIds.add(id)) selectedIds.remove(id);
+    });
+  }
+
+  Future<void> _runBatch(_BatchAction action) async {
+    final ids = Set<String>.from(selectedIds);
+    if (ids.isEmpty) return;
+    if (action == _BatchAction.delete) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('刪除 ${ids.length} 張優惠？'),
+          content: const Text('刪除後無法復原。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              key: const Key('confirm-batch-delete-button'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('確認刪除'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+    try {
+      switch (action) {
+        case _BatchAction.delete:
+          await widget.store.deleteOffers(ids);
+          break;
+        case _BatchAction.complete:
+          await widget.store.markOffersCompleted(ids);
+          break;
+        case _BatchAction.restore:
+          await widget.store.restoreOffers(ids);
+          break;
+      }
+      try {
+        await widget.reminders.sync(widget.store.activeOffers);
+      } catch (_) {
+        // Data changes remain valid even if Android reminder sync fails.
+      }
+      if (!mounted) return;
+      setState(() {
+        selectedIds.clear();
+        selectionMode = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已完成 ${ids.length} 張優惠的批次操作')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('批次操作失敗，資料未變更')),
+      );
+    }
+  }
+}
+
+enum _BatchAction { delete, complete, restore }
+
+class _BatchToolbar extends StatelessWidget {
+  const _BatchToolbar({
+    required this.count,
+    required this.onDelete,
+    required this.onComplete,
+    required this.onRestore,
+  });
+
+  final int count;
+  final VoidCallback onDelete;
+  final VoidCallback onComplete;
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Wrap(
+          spacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text('已選 $count 張'),
+            TextButton.icon(
+              key: const Key('batch-complete-button'),
+              onPressed: onComplete,
+              icon: const Icon(Icons.check),
+              label: const Text('完成'),
+            ),
+            TextButton.icon(
+              key: const Key('batch-restore-button'),
+              onPressed: onRestore,
+              icon: const Icon(Icons.undo),
+              label: const Text('恢復'),
+            ),
+            TextButton.icon(
+              key: const Key('batch-delete-button'),
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('刪除'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class AddOfferScreen extends StatefulWidget {
@@ -681,6 +991,8 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
   int reminderDaysBefore = 1;
   TimeOfDay reminderTime = const TimeOfDay(hour: 9, minute: 0);
   String? reminderError;
+  bool isFavorite = false;
+  OfferCategory category = OfferCategory.others;
 
   bool get isEditing => widget.offer != null;
 
@@ -700,6 +1012,8 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
       hour: offer.reminderHour,
       minute: offer.reminderMinute,
     );
+    isFavorite = offer.isFavorite;
+    category = offer.category;
   }
 
   @override
@@ -736,6 +1050,31 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
                 ),
                 child: Text(expiresAt == null ? '選擇日期' : formatTaiwanDate(expiresAt!)),
               ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<OfferCategory>(
+              key: const Key('offer-category-field'),
+              initialValue: category,
+              decoration: const InputDecoration(labelText: '分類'),
+              items: OfferCategory.values
+                  .map(
+                    (value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(offerCategoryLabel(value)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) setState(() => category = value);
+              },
+            ),
+            SwitchListTile.adaptive(
+              key: const Key('favorite-switch'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('加入收藏'),
+              subtitle: const Text('收藏優惠會優先出現在 My Day'),
+              value: isFavorite,
+              onChanged: (value) => setState(() => isFavorite = value),
             ),
             const SizedBox(height: 12),
             SwitchListTile.adaptive(
@@ -903,6 +1242,8 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
           reminderDaysBefore: reminderDaysBefore,
           reminderHour: reminderTime.hour,
           reminderMinute: reminderTime.minute,
+          isFavorite: isFavorite,
+          category: category,
         );
       } else {
         await widget.store.updateOffer(
@@ -915,6 +1256,8 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
           reminderDaysBefore: reminderDaysBefore,
           reminderHour: reminderTime.hour,
           reminderMinute: reminderTime.minute,
+          isFavorite: isFavorite,
+          category: category,
         );
       }
 
@@ -997,6 +1340,8 @@ class OfferDetailsScreen extends StatelessWidget {
               Text(offer.name, style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 24),
               _DetailRow(label: '到期日', value: formatTaiwanDate(offer.expiresAt)),
+              _DetailRow(label: '分類', value: offerCategoryLabel(offer.category)),
+              _DetailRow(label: '收藏', value: offer.isFavorite ? '已收藏' : '未收藏'),
               _DetailRow(
                 label: '提醒',
                 value: offer.reminderEnabled
@@ -1206,6 +1551,18 @@ String formatTaiwanTime(TimeOfDay value) {
   final minute = value.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
 }
+
+String offerCategoryLabel(OfferCategory value) => switch (value) {
+      OfferCategory.food => '餐飲',
+      OfferCategory.coffee => '咖啡',
+      OfferCategory.convenienceStore => '便利商店',
+      OfferCategory.departmentStore => '百貨公司',
+      OfferCategory.onlineShopping => '線上購物',
+      OfferCategory.entertainment => '娛樂',
+      OfferCategory.travel => '旅遊',
+      OfferCategory.transportation => '交通',
+      OfferCategory.others => '其他',
+    };
 
 extension _FirstOrNull<E> on Iterable<E> {
   E? get firstOrNull => isEmpty ? null : first;

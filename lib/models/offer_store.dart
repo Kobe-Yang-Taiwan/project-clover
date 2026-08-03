@@ -11,6 +11,7 @@ enum OfferFilter {
   completed,
   reminderEnabled,
   reminderDisabled,
+  favorites,
 }
 
 enum OfferSortOption {
@@ -37,6 +38,20 @@ class OfferDashboard {
   final int completed;
   final int total;
   final Offer? nextExpiring;
+}
+
+class MyDayDashboard {
+  const MyDayDashboard({
+    required this.recommendedToday,
+    required this.expiringToday,
+    required this.expiringTomorrow,
+    required this.mustUseThisWeek,
+  });
+
+  final Offer? recommendedToday;
+  final List<Offer> expiringToday;
+  final List<Offer> expiringTomorrow;
+  final List<Offer> mustUseThisWeek;
 }
 
 class OfferStore extends ChangeNotifier {
@@ -98,6 +113,7 @@ class OfferStore extends ChangeNotifier {
     OfferFilter filter = OfferFilter.all,
     OfferSortOption? sort,
     DateTime? now,
+    OfferCategory? category,
   }) {
     final today = _dateOnly(now ?? DateTime.now());
     final keyword = query.trim().toLowerCase();
@@ -107,6 +123,7 @@ class OfferStore extends ChangeNotifier {
           offer.source.toLowerCase().contains(keyword) ||
           offer.note.toLowerCase().contains(keyword);
       if (!matchesSearch) return false;
+      if (category != null && offer.category != category) return false;
 
       final expiry = _dateOnly(offer.expiresAt);
       final days = expiry.difference(today).inDays;
@@ -121,10 +138,39 @@ class OfferStore extends ChangeNotifier {
           !offer.isCompleted && offer.reminderEnabled,
         OfferFilter.reminderDisabled =>
           !offer.isCompleted && !offer.reminderEnabled,
+        OfferFilter.favorites => offer.isFavorite,
       };
     }).toList();
     _sortOffers(results, sort ?? _sortOption);
     return List<Offer>.unmodifiable(results);
+  }
+
+  MyDayDashboard myDay({DateTime? now}) {
+    final today = _dateOnly(now ?? DateTime.now());
+    final active = _offers.where((offer) => !offer.isCompleted).toList();
+    int daysUntil(Offer offer) =>
+        _dateOnly(offer.expiresAt).difference(today).inDays;
+    List<Offer> forDay(int day) => active
+        .where((offer) => daysUntil(offer) == day)
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    final upcoming = active.where((offer) => daysUntil(offer) >= 0).toList()
+      ..sort((a, b) {
+        final favorite = (b.isFavorite ? 1 : 0).compareTo(a.isFavorite ? 1 : 0);
+        if (favorite != 0) return favorite;
+        final expiry = a.expiresAt.compareTo(b.expiresAt);
+        return expiry == 0 ? a.id.compareTo(b.id) : expiry;
+      });
+    final week = active
+        .where((offer) => daysUntil(offer) >= 2 && daysUntil(offer) <= 7)
+        .toList()
+      ..sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
+    return MyDayDashboard(
+      recommendedToday: upcoming.firstOrNull,
+      expiringToday: List.unmodifiable(forDay(0)),
+      expiringTomorrow: List.unmodifiable(forDay(1)),
+      mustUseThisWeek: List.unmodifiable(week),
+    );
   }
 
   OfferDashboard dashboard({DateTime? now}) {
@@ -212,6 +258,8 @@ class OfferStore extends ChangeNotifier {
     int reminderDaysBefore = 1,
     int reminderHour = 9,
     int reminderMinute = 0,
+    bool isFavorite = false,
+    OfferCategory category = OfferCategory.others,
   }) async {
     final now = DateTime.now();
     final offer = Offer(
@@ -226,6 +274,8 @@ class OfferStore extends ChangeNotifier {
       reminderMinute: reminderMinute,
       createdAt: now,
       updatedAt: now,
+      isFavorite: isFavorite,
+      category: category,
     );
     _offers.add(offer);
     try {
@@ -248,6 +298,8 @@ class OfferStore extends ChangeNotifier {
     int reminderDaysBefore = 1,
     int reminderHour = 9,
     int reminderMinute = 0,
+    bool? isFavorite,
+    OfferCategory? category,
   }) async {
     final index = _offers.indexWhere((offer) => offer.id == id);
     if (index == -1) throw StateError('Offer not found');
@@ -263,11 +315,80 @@ class OfferStore extends ChangeNotifier {
       reminderHour: reminderHour,
       reminderMinute: reminderMinute,
       updatedAt: DateTime.now(),
+      isFavorite: isFavorite,
+      category: category,
     );
     try {
       await _persist();
     } catch (_) {
       _offers[index] = previous;
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> toggleFavorite(String id) async {
+    final index = _offers.indexWhere((offer) => offer.id == id);
+    if (index == -1) return;
+    final previous = _offers[index];
+    _offers[index] = previous.copyWith(
+      isFavorite: !previous.isFavorite,
+      updatedAt: DateTime.now(),
+    );
+    try {
+      await _persist();
+    } catch (_) {
+      _offers[index] = previous;
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteOffers(Set<String> ids) => _batchUpdate(
+        (offers) => offers.removeWhere((offer) => ids.contains(offer.id)),
+      );
+
+  Future<void> markOffersCompleted(
+    Set<String> ids, {
+    DateTime? completedAt,
+  }) =>
+      _batchUpdate((offers) {
+        final now = completedAt ?? DateTime.now();
+        for (var index = 0; index < offers.length; index++) {
+          final offer = offers[index];
+          if (ids.contains(offer.id) && !offer.isCompleted) {
+            offers[index] = offer.copyWith(
+              status: OfferStatus.completed,
+              completedAt: now,
+              updatedAt: now,
+            );
+          }
+        }
+      });
+
+  Future<void> restoreOffers(Set<String> ids) => _batchUpdate((offers) {
+        final now = DateTime.now();
+        for (var index = 0; index < offers.length; index++) {
+          final offer = offers[index];
+          if (ids.contains(offer.id) && offer.isCompleted) {
+            offers[index] = offer.copyWith(
+              status: OfferStatus.active,
+              clearCompletedAt: true,
+              updatedAt: now,
+            );
+          }
+        }
+      });
+
+  Future<void> _batchUpdate(void Function(List<Offer>) update) async {
+    final previous = List<Offer>.from(_offers);
+    update(_offers);
+    try {
+      await _persist();
+    } catch (_) {
+      _offers
+        ..clear()
+        ..addAll(previous);
       rethrow;
     }
     notifyListeners();

@@ -10,6 +10,8 @@ void main() {
         id: 'active',
         name: '待使用優惠',
         expiresAt: DateTime(2026, 9, 1),
+        isFavorite: true,
+        category: OfferCategory.coffee,
         reminderDaysBefore: 3,
         reminderHour: 18,
         reminderMinute: 45,
@@ -32,6 +34,8 @@ void main() {
     expect(decoded.completedCount, 1);
     expect(decoded.offers.first.reminderDaysBefore, 3);
     expect(decoded.offers.first.reminderHour, 18);
+    expect(decoded.offers.first.isFavorite, isTrue);
+    expect(decoded.offers.first.category, OfferCategory.coffee);
     expect(decoded.offers.last.completedAt, DateTime(2026, 7, 31, 12));
   });
 

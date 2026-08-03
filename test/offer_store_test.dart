@@ -425,6 +425,106 @@ void main() {
     );
     expect(on(7).visualStatus(now: now), OfferVisualStatus.available);
   });
+
+  test('favorite state persists and favorites filter combines with category', () async {
+    final storage = MemoryOfferStorage();
+    final store = OfferStore(
+      initialOffers: [
+        Offer(
+          id: 'coffee',
+          name: '咖啡券',
+          expiresAt: DateTime(2026, 8, 10),
+          category: OfferCategory.coffee,
+        ),
+        Offer(
+          id: 'food',
+          name: '餐券',
+          expiresAt: DateTime(2026, 8, 11),
+          category: OfferCategory.food,
+          isFavorite: true,
+        ),
+      ],
+      storage: storage,
+    );
+
+    await store.toggleFavorite('coffee');
+    final reopened = await OfferStore.load(storage: storage);
+
+    expect(reopened.allOffers.firstWhere((offer) => offer.id == 'coffee').isFavorite, isTrue);
+    expect(
+      reopened
+          .queryOffers(
+            filter: OfferFilter.favorites,
+            category: OfferCategory.coffee,
+          )
+          .single
+          .id,
+      'coffee',
+    );
+  });
+
+  test('legacy JSON defaults to others category and not favorite', () {
+    final offer = Offer.fromJson({
+      'id': 'legacy-v09',
+      'name': '舊資料',
+      'expiresAt': '2026-08-10T00:00:00.000',
+    });
+
+    expect(offer.category, OfferCategory.others);
+    expect(offer.isFavorite, isFalse);
+  });
+
+  test('My Day groups dates and prioritizes favorite recommendation', () {
+    final store = OfferStore(
+      initialOffers: [
+        Offer(id: 'today', name: '今天', expiresAt: DateTime(2026, 8, 3)),
+        Offer(id: 'tomorrow', name: '明天', expiresAt: DateTime(2026, 8, 4)),
+        Offer(id: 'week', name: '本週', expiresAt: DateTime(2026, 8, 8)),
+        Offer(
+          id: 'favorite',
+          name: '收藏優先',
+          expiresAt: DateTime(2026, 8, 10),
+          isFavorite: true,
+        ),
+        Offer(
+          id: 'done',
+          name: '已完成',
+          expiresAt: DateTime(2026, 8, 3),
+          status: OfferStatus.completed,
+        ),
+      ],
+    );
+
+    final result = store.myDay(now: DateTime(2026, 8, 3, 23));
+
+    expect(result.recommendedToday?.id, 'favorite');
+    expect(result.expiringToday.map((offer) => offer.id), ['today']);
+    expect(result.expiringTomorrow.map((offer) => offer.id), ['tomorrow']);
+    expect(result.mustUseThisWeek.map((offer) => offer.id), ['week']);
+  });
+
+  test('batch operations persist completion restore and deletion atomically', () async {
+    final storage = MemoryOfferStorage();
+    final store = OfferStore(
+      initialOffers: [
+        Offer(id: 'a', name: 'A', expiresAt: DateTime(2026, 8, 10)),
+        Offer(id: 'b', name: 'B', expiresAt: DateTime(2026, 8, 11)),
+        Offer(id: 'c', name: 'C', expiresAt: DateTime(2026, 8, 12)),
+      ],
+      storage: storage,
+    );
+
+    await store.markOffersCompleted({'a', 'b'}, completedAt: DateTime(2026, 8, 3));
+    expect(store.completedOffers.map((offer) => offer.id).toSet(), {'a', 'b'});
+
+    await store.restoreOffers({'a'});
+    expect(store.activeOffers.map((offer) => offer.id).toSet(), {'a', 'c'});
+    expect(store.allOffers.firstWhere((offer) => offer.id == 'a').completedAt, isNull);
+
+    await store.deleteOffers({'b', 'c'});
+    final reopened = await OfferStore.load(storage: storage);
+    expect(reopened.allOffers.single.id, 'a');
+  });
 }
 
 class MemoryOfferStorage implements OfferStorage {
