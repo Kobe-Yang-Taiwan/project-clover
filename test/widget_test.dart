@@ -80,7 +80,10 @@ void main() {
     await tester.scrollUntilVisible(
       saveButton,
       300,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find.descendant(
+        of: find.byType(ListView),
+        matching: find.byType(Scrollable),
+      ),
     );
     await tester.drag(
       find.byType(ListView),

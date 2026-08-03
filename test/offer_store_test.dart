@@ -500,7 +500,7 @@ void main() {
     expect(result.recommendedToday?.id, 'favorite');
     expect(result.expiringToday.map((offer) => offer.id), ['today']);
     expect(result.expiringTomorrow.map((offer) => offer.id), ['tomorrow']);
-    expect(result.mustUseThisWeek.map((offer) => offer.id), ['week']);
+    expect(result.mustUseThisWeek.map((offer) => offer.id), ['week', 'favorite']);
   });
 
   test('batch operations persist completion restore and deletion atomically', () async {

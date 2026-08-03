@@ -408,6 +408,43 @@ class TodayScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+        GridView.count(
+          key: const Key('dashboard-metrics'),
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 2.25,
+          children: [
+            _DashboardMetric(
+              key: const Key('dashboard-today'),
+              label: '今天到期',
+              value: summary.expiringToday,
+            ),
+            _DashboardMetric(
+              key: const Key('dashboard-three-days'),
+              label: '3 天內到期',
+              value: summary.expiringWithinThreeDays,
+            ),
+            _DashboardMetric(
+              key: const Key('dashboard-seven-days'),
+              label: '7 天內到期',
+              value: summary.expiringWithinSevenDays,
+            ),
+            _DashboardMetric(
+              key: const Key('dashboard-completed'),
+              label: '已完成',
+              value: summary.completed,
+            ),
+            _DashboardMetric(
+              key: const Key('dashboard-total'),
+              label: '全部優惠',
+              value: summary.total,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
         _OfferSection(
           title: '今日推薦',
           emptyMessage: '今天沒有推薦項目',
@@ -445,45 +482,6 @@ class TodayScreen extends StatelessWidget {
           offers: favorites,
           store: store,
           reminders: reminders,
-        ),
-        const SizedBox(height: 8),
-        Text('優惠總覽', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
-        GridView.count(
-          key: const Key('dashboard-metrics'),
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 2.25,
-          children: [
-            _DashboardMetric(
-              key: const Key('dashboard-today'),
-              label: '今天到期',
-              value: summary.expiringToday,
-            ),
-            _DashboardMetric(
-              key: const Key('dashboard-three-days'),
-              label: '3 天內到期',
-              value: summary.expiringWithinThreeDays,
-            ),
-            _DashboardMetric(
-              key: const Key('dashboard-seven-days'),
-              label: '7 天內到期',
-              value: summary.expiringWithinSevenDays,
-            ),
-            _DashboardMetric(
-              key: const Key('dashboard-completed'),
-              label: '已完成',
-              value: summary.completed,
-            ),
-            _DashboardMetric(
-              key: const Key('dashboard-total'),
-              label: '全部優惠',
-              value: summary.total,
-            ),
-          ],
         ),
       ],
     );
