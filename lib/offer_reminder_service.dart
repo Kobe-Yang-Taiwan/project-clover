@@ -7,6 +7,16 @@ import 'models/offer.dart';
 
 enum NotificationPermissionState { granted, denied, unknown }
 
+bool shouldScheduleOfferReminder(
+  Offer offer, {
+  required DateTime scheduledDate,
+  required DateTime now,
+}) {
+  return !offer.isCompleted &&
+      offer.reminderEnabled &&
+      scheduledDate.isAfter(now);
+}
+
 abstract interface class OfferReminderScheduler {
   String? get initialOfferId;
 
@@ -127,7 +137,13 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler {
         reminder.hour,
         reminder.minute,
       );
-      if (!scheduledDate.isAfter(now)) continue;
+      if (!shouldScheduleOfferReminder(
+        offer,
+        scheduledDate: scheduledDate,
+        now: now,
+      )) {
+        continue;
+      }
 
       await _notifications.zonedSchedule(
         id: notificationIdFor(offer.id),

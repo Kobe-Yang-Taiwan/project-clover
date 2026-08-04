@@ -535,8 +535,8 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
                 ListTile(
                   key: const Key('send-feedback-button'),
                   leading: const Icon(Icons.mail_outline),
-                  title: const Text('Send Feedback｜傳送回饋'),
-                  subtitle: const Text('開啟 Email，附上版本與裝置資訊'),
+                  title: const Text('Beta Feedback｜測試回饋'),
+                  subtitle: const Text('開啟 Email，附上版本、Android 與裝置型號'),
                   trailing: const Icon(Icons.open_in_new),
                   onTap: isBusy ? null : _sendFeedback,
                 ),

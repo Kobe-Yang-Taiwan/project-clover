@@ -51,8 +51,8 @@ class DiagnosticInfo {
 Project Clover 測試資訊
 App Version: $appVersion
 Build Number: $buildNumber
-Device: $deviceInformation
 Android Version: $androidVersion
+Device Model: $deviceInformation
 ''';
 }
 
@@ -130,7 +130,7 @@ Uri feedbackEmailUri(DiagnosticInfo info) {
   return Uri(
     scheme: 'mailto',
     queryParameters: {
-      'subject': 'Project Clover Beta 回饋',
+      'subject': 'Project Clover Beta Feedback',
       'body': info.toFeedbackBody(),
     },
   );

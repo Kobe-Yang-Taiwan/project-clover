@@ -2,10 +2,15 @@
 
 Project Clover 是一款 Android 優先的優惠管理原型，協助使用者快速看見即將到期的優惠，避免已擁有的價值因遺忘而浪費。
 
-## Prototype V0.11 Beta Readiness 已包含
+## Prototype V0.12 Beta Validation 已包含
+
+- Founder 驗收清單依核心功能、通知、備份／還原、Dashboard、My Day、搜尋／篩選／排序分組
+- Beta Feedback：開啟 Email App，預先附上版本、Build、Android 版本與裝置型號
+- Beta 發布說明、已知問題、FAQ 與 Google Play Release Checklist
+- 通知排程／取消、V0.8～V0.11 備份相容、還原與清理的可靠性測試
 
 - 診斷資訊匯出：App 版本、Build、Android 版本、通知權限及資料庫版本
-- 使用者回饋：開啟 Email App，預先附上版本、Build 與裝置資訊
+- 使用者回饋不包含優惠內容
 - 過期優惠清理：可刪除超過 30 天、90 天、1 年或全部過期優惠
 - 清理前顯示筆數並要求確認；完成後重新同步有效提醒
 - 全域提醒預設：設定新優惠預設的提醒開關、提前天數與時間
@@ -105,4 +110,4 @@ Project Clover 是一款 Android 優先的優惠管理原型，協助使用者�
 20. 確認修改全域預設後，原有優惠的提醒設定完全不變
 21. 建立超過 30 天的過期測試優惠，執行清理並確認先顯示筆數及二次確認
 22. 匯出診斷資訊，確認 JSON 包含版本、Build、Android、通知權限及資料庫版本
-23. 點選傳送回饋，確認 Email App 開啟並帶入版本、Build 與裝置資訊
+23. 點選 Beta Feedback，確認 Email App 開啟並帶入版本、Build、Android 版本與裝置型號

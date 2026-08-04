@@ -612,6 +612,48 @@ void main() {
       'completed-old',
     });
   });
+
+  test('all cleanup ranges select only their intended expired offers', () {
+    final now = DateTime(2026, 8, 4);
+    final store = OfferStore(
+      initialOffers: [
+        Offer(id: '31', name: '31 天', expiresAt: DateTime(2026, 7, 3)),
+        Offer(id: '91', name: '91 天', expiresAt: DateTime(2026, 5, 4)),
+        Offer(id: '366', name: '366 天', expiresAt: DateTime(2025, 8, 3)),
+        Offer(id: 'yesterday', name: '昨天', expiresAt: DateTime(2026, 8, 3)),
+      ],
+    );
+
+    Set<String> ids(ExpiredCleanupRange range) => store
+        .expiredOffersForCleanup(range, now: now)
+        .map((offer) => offer.id)
+        .toSet();
+
+    expect(ids(ExpiredCleanupRange.olderThan30Days), {'31', '91', '366'});
+    expect(ids(ExpiredCleanupRange.olderThan90Days), {'91', '366'});
+    expect(ids(ExpiredCleanupRange.olderThanOneYear), {'366'});
+    expect(ids(ExpiredCleanupRange.all), {'31', '91', '366', 'yesterday'});
+  });
+
+  test('cleanup rolls back every deletion when persistence fails', () async {
+    final storage = FailingOfferStorage();
+    final store = OfferStore(
+      initialOffers: [
+        Offer(id: 'old-a', name: '舊 A', expiresAt: DateTime(2026, 1, 1)),
+        Offer(id: 'old-b', name: '舊 B', expiresAt: DateTime(2026, 2, 1)),
+      ],
+      storage: storage,
+    );
+
+    await expectLater(
+      store.cleanupExpiredOffers(
+        ExpiredCleanupRange.all,
+        now: DateTime(2026, 8, 4),
+      ),
+      throwsStateError,
+    );
+    expect(store.allOffers.map((offer) => offer.id), ['old-a', 'old-b']);
+  });
 }
 
 class MemoryOfferStorage implements OfferStorage {
@@ -626,6 +668,16 @@ class MemoryOfferStorage implements OfferStorage {
   @override
   Future<void> saveOffers(List<Offer> offers) async {
     savedOffers = List<Offer>.from(offers);
+  }
+}
+
+class FailingOfferStorage implements OfferStorage {
+  @override
+  Future<List<Offer>?> loadOffers() async => null;
+
+  @override
+  Future<void> saveOffers(List<Offer> offers) {
+    throw StateError('simulated write failure');
   }
 }
 

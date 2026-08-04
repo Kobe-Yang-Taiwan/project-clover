@@ -99,6 +99,7 @@ void main() {
   });
 
   testWidgets('deleting an offer requires confirmation', (tester) async {
+    final reminders = RecordingReminderScheduler();
     final store = OfferStore(
       initialOffers: [
         Offer(
@@ -108,7 +109,7 @@ void main() {
         ),
       ],
     );
-    await tester.pumpWidget(CloverApp(store: store));
+    await tester.pumpWidget(CloverApp(store: store, reminders: reminders));
 
     await tester.tap(find.text('優惠清單'));
     await tester.pumpAndSettle();
@@ -124,12 +125,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(store.activeOffers, isEmpty);
+    expect(reminders.cancelledOfferIds, ['delete-offer']);
     expect(find.text('優惠已刪除'), findsOneWidget);
   });
 
   testWidgets('offer can be marked completed', (tester) async {
+    final reminders = RecordingReminderScheduler();
     final store = OfferStore();
-    await tester.pumpWidget(CloverApp(store: store));
+    await tester.pumpWidget(CloverApp(store: store, reminders: reminders));
 
     await tester.tap(find.text('優惠清單'));
     await tester.pumpAndSettle();
@@ -140,6 +143,7 @@ void main() {
 
     expect(store.completedOffers.map((offer) => offer.id), contains('coffee'));
     expect(store.completedOffers.first.completedAt, isNotNull);
+    expect(reminders.cancelledOfferIds, ['coffee']);
     expect(find.text('已標記完成，成功保住這份價值！'), findsOneWidget);
   });
 
@@ -366,6 +370,7 @@ void main() {
   testWidgets('expired cleanup requires confirmation before deleting', (
     tester,
   ) async {
+    final reminders = RecordingReminderScheduler();
     final now = DateTime.now();
     final oldOffer = Offer(
       id: 'old-expired',
@@ -374,7 +379,7 @@ void main() {
           .subtract(const Duration(days: 31)),
     );
     final store = OfferStore(initialOffers: [oldOffer]);
-    await tester.pumpWidget(CloverApp(store: store));
+    await tester.pumpWidget(CloverApp(store: store, reminders: reminders));
 
     await tester.tap(find.byKey(const Key('settings-button')));
     await tester.pumpAndSettle();
@@ -398,8 +403,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(store.allOffers, isEmpty);
+    expect(reminders.syncedOfferIds, isEmpty);
+    expect(reminders.syncCount, 1);
     expect(find.text('已刪除 1 張過期優惠'), findsOneWidget);
   });
+}
+
+class RecordingReminderScheduler implements OfferReminderScheduler {
+  final List<String> cancelledOfferIds = [];
+  List<String> syncedOfferIds = [];
+  int syncCount = 0;
+
+  @override
+  String? get initialOfferId => null;
+
+  @override
+  Future<void> cancel(String offerId) async {
+    cancelledOfferIds.add(offerId);
+  }
+
+  @override
+  Future<NotificationPermissionState> permissionState() async =>
+      NotificationPermissionState.granted;
+
+  @override
+  Future<bool> requestPermission() async => true;
+
+  @override
+  Future<void> sync(Iterable<Offer> activeOffers) async {
+    syncCount++;
+    syncedOfferIds = activeOffers.map((offer) => offer.id).toList();
+  }
 }
 
 class FakeBackupFileService implements OfferBackupFileService {
@@ -425,8 +459,8 @@ class FakeBackupFileService implements OfferBackupFileService {
 
 class FakeDiagnosticInfoProvider implements DiagnosticInfoProvider {
   final DiagnosticInfo info = const DiagnosticInfo(
-    appVersion: '0.11.0',
-    buildNumber: '11',
+    appVersion: '0.12.0',
+    buildNumber: '12',
     androidVersion: '16 (SDK 36)',
     deviceInformation: 'Test Phone',
     notificationPermission: NotificationPermissionState.granted,
