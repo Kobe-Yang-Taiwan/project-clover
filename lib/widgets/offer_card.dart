@@ -43,10 +43,7 @@ class OfferCard extends StatelessWidget {
           child: Row(
             children: [
               if (selectionMode)
-                Checkbox(
-                  value: isSelected,
-                  onChanged: (_) => onTap(),
-                )
+                Checkbox(value: isSelected, onChanged: (_) => onTap())
               else
                 Container(
                   width: 48,
@@ -145,16 +142,16 @@ class OfferCard extends StatelessWidget {
   }
 
   IconData _categoryIcon(OfferCategory category) => switch (category) {
-        OfferCategory.food => Icons.restaurant_outlined,
-        OfferCategory.coffee => Icons.local_cafe_outlined,
-        OfferCategory.convenienceStore => Icons.storefront_outlined,
-        OfferCategory.departmentStore => Icons.local_mall_outlined,
-        OfferCategory.onlineShopping => Icons.shopping_cart_outlined,
-        OfferCategory.entertainment => Icons.movie_outlined,
-        OfferCategory.travel => Icons.luggage_outlined,
-        OfferCategory.transportation => Icons.directions_bus_outlined,
-        OfferCategory.others => Icons.confirmation_number_outlined,
-      };
+    OfferCategory.food => Icons.restaurant_outlined,
+    OfferCategory.coffee => Icons.local_cafe_outlined,
+    OfferCategory.convenienceStore => Icons.storefront_outlined,
+    OfferCategory.departmentStore => Icons.local_mall_outlined,
+    OfferCategory.onlineShopping => Icons.shopping_cart_outlined,
+    OfferCategory.entertainment => Icons.movie_outlined,
+    OfferCategory.travel => Icons.luggage_outlined,
+    OfferCategory.transportation => Icons.directions_bus_outlined,
+    OfferCategory.others => Icons.confirmation_number_outlined,
+  };
 }
 
 String formatTaiwanDate(DateTime date) =>

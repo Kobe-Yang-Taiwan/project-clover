@@ -47,17 +47,15 @@ class Offer {
     final storedDays = json['reminderDaysBefore'] as int?;
     final migratedDays = legacyReminderAt == null
         ? 1
-        : DateTime(
-            expiresAt.year,
-            expiresAt.month,
-            expiresAt.day,
-          ).difference(
-            DateTime(
-              legacyReminderAt.year,
-              legacyReminderAt.month,
-              legacyReminderAt.day,
-            ),
-          ).inDays;
+        : DateTime(expiresAt.year, expiresAt.month, expiresAt.day)
+              .difference(
+                DateTime(
+                  legacyReminderAt.year,
+                  legacyReminderAt.month,
+                  legacyReminderAt.day,
+                ),
+              )
+              .inDays;
     final statusName = json['status'] as String? ?? OfferStatus.active.name;
 
     return Offer(
@@ -111,12 +109,12 @@ class Offer {
   final OfferCategory category;
 
   DateTime get effectiveReminderAt => DateTime(
-        expiresAt.year,
-        expiresAt.month,
-        expiresAt.day,
-        reminderHour,
-        reminderMinute,
-      ).subtract(Duration(days: reminderDaysBefore));
+    expiresAt.year,
+    expiresAt.month,
+    expiresAt.day,
+    reminderHour,
+    reminderMinute,
+  ).subtract(Duration(days: reminderDaysBefore));
 
   bool get isCompleted => status == OfferStatus.completed;
 
@@ -133,22 +131,22 @@ class Offer {
   }
 
   Map<String, Object?> toJson() => {
-        'id': id,
-        'name': name,
-        'expiresAt': expiresAt.toIso8601String(),
-        'source': source,
-        'note': note,
-        'reminderEnabled': reminderEnabled,
-        'reminderDaysBefore': reminderDaysBefore,
-        'reminderHour': reminderHour,
-        'reminderMinute': reminderMinute,
-        'status': status.name,
-        'completedAt': completedAt?.toIso8601String(),
-        if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
-        if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
-        'isFavorite': isFavorite,
-        'category': category.name,
-      };
+    'id': id,
+    'name': name,
+    'expiresAt': expiresAt.toIso8601String(),
+    'source': source,
+    'note': note,
+    'reminderEnabled': reminderEnabled,
+    'reminderDaysBefore': reminderDaysBefore,
+    'reminderHour': reminderHour,
+    'reminderMinute': reminderMinute,
+    'status': status.name,
+    'completedAt': completedAt?.toIso8601String(),
+    if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+    if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+    'isFavorite': isFavorite,
+    'category': category.name,
+  };
 
   Offer copyWith({
     String? name,
@@ -174,13 +172,11 @@ class Offer {
       source: source ?? this.source,
       note: note ?? this.note,
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
-      reminderDaysBefore:
-          reminderDaysBefore ?? this.reminderDaysBefore,
+      reminderDaysBefore: reminderDaysBefore ?? this.reminderDaysBefore,
       reminderHour: reminderHour ?? this.reminderHour,
       reminderMinute: reminderMinute ?? this.reminderMinute,
       status: status ?? this.status,
-      completedAt:
-          clearCompletedAt ? null : completedAt ?? this.completedAt,
+      completedAt: clearCompletedAt ? null : completedAt ?? this.completedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isFavorite: isFavorite ?? this.isFavorite,
@@ -191,9 +187,8 @@ class Offer {
 
 int normalizeReminderDays(int value) {
   return Offer.supportedReminderDays.reduce(
-    (closest, candidate) =>
-        (candidate - value).abs() < (closest - value).abs()
-            ? candidate
-            : closest,
+    (closest, candidate) => (candidate - value).abs() < (closest - value).abs()
+        ? candidate
+        : closest,
   );
 }

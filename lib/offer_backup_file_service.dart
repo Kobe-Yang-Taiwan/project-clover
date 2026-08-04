@@ -11,10 +11,7 @@ class OfferBackupFile {
 }
 
 abstract interface class OfferBackupFileService {
-  Future<bool> saveBackup({
-    required String fileName,
-    required String content,
-  });
+  Future<bool> saveBackup({required String fileName, required String content});
 
   Future<OfferBackupFile?> pickBackup();
 }

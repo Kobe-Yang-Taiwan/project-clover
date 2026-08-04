@@ -35,17 +35,7 @@ jobs:
         run: flutter pub get
 
       - name: Check formatting
-        run: dart format lib test
-
-      - name: Upload formatted sources
-        uses: actions/upload-artifact@v6
-        with:
-          name: project-clover-formatted-sources
-          path: |
-            lib
-            test
-          if-no-files-found: error
-          retention-days: 1
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: Analyze
         run: flutter analyze

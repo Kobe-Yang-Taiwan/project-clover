@@ -44,11 +44,11 @@ class ReminderDefaults {
   }
 
   Map<String, Object> toJson() => {
-        'enabled': enabled,
-        'daysBefore': daysBefore,
-        'hour': hour,
-        'minute': minute,
-      };
+    'enabled': enabled,
+    'daysBefore': daysBefore,
+    'hour': hour,
+    'minute': minute,
+  };
 
   factory ReminderDefaults.fromJson(Map<String, dynamic> json) {
     return ReminderDefaults(
@@ -69,11 +69,10 @@ abstract interface class ReminderDefaultsStorage {
 class SharedPreferencesOfferSettingsStorage
     implements OfferSettingsStorage, ReminderDefaultsStorage {
   SharedPreferencesOfferSettingsStorage({SharedPreferencesAsync? preferences})
-      : _preferences = preferences ?? SharedPreferencesAsync();
+    : _preferences = preferences ?? SharedPreferencesAsync();
 
   static const _sortKey = 'project_clover.sort_option.v1';
-  static const _reminderDefaultsKey =
-      'project_clover.reminder_defaults.v1';
+  static const _reminderDefaultsKey = 'project_clover.reminder_defaults.v1';
   final SharedPreferencesAsync _preferences;
 
   @override
@@ -103,7 +102,7 @@ class SharedPreferencesOfferSettingsStorage
 
 class SharedPreferencesOfferStorage implements OfferStorage {
   SharedPreferencesOfferStorage({SharedPreferencesAsync? preferences})
-      : _preferences = preferences ?? SharedPreferencesAsync();
+    : _preferences = preferences ?? SharedPreferencesAsync();
 
   static const _storageKey = 'project_clover.offers.v1';
   static const schemaVersion = 1;
@@ -119,11 +118,7 @@ class SharedPreferencesOfferStorage implements OfferStorage {
       final decoded = jsonDecode(raw);
       if (decoded is! List) return null;
       return decoded
-          .map(
-            (item) => Offer.fromJson(
-              Map<String, dynamic>.from(item as Map),
-            ),
-          )
+          .map((item) => Offer.fromJson(Map<String, dynamic>.from(item as Map)))
           .toList();
     } catch (_) {
       return null;
@@ -132,9 +127,7 @@ class SharedPreferencesOfferStorage implements OfferStorage {
 
   @override
   Future<void> saveOffers(List<Offer> offers) {
-    final encoded = jsonEncode(
-      offers.map((offer) => offer.toJson()).toList(),
-    );
+    final encoded = jsonEncode(offers.map((offer) => offer.toJson()).toList());
     return _preferences.setString(_storageKey, encoded);
   }
 }

@@ -73,12 +73,12 @@ class OfferStore extends ChangeNotifier {
     ReminderDefaultsStorage? reminderDefaultsStorage,
     OfferSortOption initialSortOption = OfferSortOption.expirationAscending,
     ReminderDefaults initialReminderDefaults = const ReminderDefaults(),
-  })  : _offers = List<Offer>.from(initialOffers ?? _demoOffers()),
-        _storage = storage,
-        _settingsStorage = settingsStorage,
-        _reminderDefaultsStorage = reminderDefaultsStorage,
-        _sortOption = initialSortOption,
-        _reminderDefaults = initialReminderDefaults;
+  }) : _offers = List<Offer>.from(initialOffers ?? _demoOffers()),
+       _storage = storage,
+       _settingsStorage = settingsStorage,
+       _reminderDefaultsStorage = reminderDefaultsStorage,
+       _sortOption = initialSortOption,
+       _reminderDefaults = initialReminderDefaults;
 
   final List<Offer> _offers;
   final OfferStorage? _storage;
@@ -106,7 +106,7 @@ class OfferStore extends ChangeNotifier {
     final storedSort = await settings?.loadSortOption();
     final defaults =
         await reminderSettings?.loadReminderDefaults() ??
-            const ReminderDefaults();
+        const ReminderDefaults();
     final sortOption = OfferSortOption.values.firstWhere(
       (option) => option.name == storedSort,
       orElse: () => OfferSortOption.expirationAscending,
@@ -159,7 +159,8 @@ class OfferStore extends ChangeNotifier {
     final today = _dateOnly(now ?? DateTime.now());
     final keyword = query.trim().toLowerCase();
     final results = _offers.where((offer) {
-      final matchesSearch = keyword.isEmpty ||
+      final matchesSearch =
+          keyword.isEmpty ||
           offer.name.toLowerCase().contains(keyword) ||
           offer.source.toLowerCase().contains(keyword) ||
           offer.note.toLowerCase().contains(keyword);
@@ -191,10 +192,9 @@ class OfferStore extends ChangeNotifier {
     final active = _offers.where((offer) => !offer.isCompleted).toList();
     int daysUntil(Offer offer) =>
         _dateOnly(offer.expiresAt).difference(today).inDays;
-    List<Offer> forDay(int day) => active
-        .where((offer) => daysUntil(offer) == day)
-        .toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    List<Offer> forDay(int day) =>
+        active.where((offer) => daysUntil(offer) == day).toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
     final upcoming = active.where((offer) => daysUntil(offer) >= 0).toList()
       ..sort((a, b) {
         final favorite = (b.isFavorite ? 1 : 0).compareTo(a.isFavorite ? 1 : 0);
@@ -202,10 +202,11 @@ class OfferStore extends ChangeNotifier {
         final expiry = a.expiresAt.compareTo(b.expiresAt);
         return expiry == 0 ? a.id.compareTo(b.id) : expiry;
       });
-    final week = active
-        .where((offer) => daysUntil(offer) >= 2 && daysUntil(offer) <= 7)
-        .toList()
-      ..sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
+    final week =
+        active
+            .where((offer) => daysUntil(offer) >= 2 && daysUntil(offer) <= 7)
+            .toList()
+          ..sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
     return MyDayDashboard(
       recommendedToday: upcoming.firstOrNull,
       expiringToday: List.unmodifiable(forDay(0)),
@@ -221,10 +222,11 @@ class OfferStore extends ChangeNotifier {
       final difference = _dateOnly(offer.expiresAt).difference(today).inDays;
       return difference >= 0 && difference <= days;
     }).length;
-    final upcoming = active
-        .where((offer) => !_dateOnly(offer.expiresAt).isBefore(today))
-        .toList()
-      ..sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
+    final upcoming =
+        active
+            .where((offer) => !_dateOnly(offer.expiresAt).isBefore(today))
+            .toList()
+          ..sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
     return OfferDashboard(
       expiringToday: within(0),
       expiringWithinThreeDays: within(3),
@@ -239,24 +241,33 @@ class OfferStore extends ChangeNotifier {
     int stable(Offer a, Offer b) => a.id.compareTo(b.id);
     offers.sort((a, b) {
       final comparison = switch (option) {
-        OfferSortOption.expirationAscending =>
-          a.expiresAt.compareTo(b.expiresAt),
-        OfferSortOption.expirationDescending =>
-          b.expiresAt.compareTo(a.expiresAt),
-        OfferSortOption.createdNewest => _activityDate(b, created: true)
-            .compareTo(_activityDate(a, created: true)),
-        OfferSortOption.createdOldest => _activityDate(a, created: true)
-            .compareTo(_activityDate(b, created: true)),
-        OfferSortOption.recentlyModified =>
-          _activityDate(b).compareTo(_activityDate(a)),
+        OfferSortOption.expirationAscending => a.expiresAt.compareTo(
+          b.expiresAt,
+        ),
+        OfferSortOption.expirationDescending => b.expiresAt.compareTo(
+          a.expiresAt,
+        ),
+        OfferSortOption.createdNewest => _activityDate(
+          b,
+          created: true,
+        ).compareTo(_activityDate(a, created: true)),
+        OfferSortOption.createdOldest => _activityDate(
+          a,
+          created: true,
+        ).compareTo(_activityDate(b, created: true)),
+        OfferSortOption.recentlyModified => _activityDate(
+          b,
+        ).compareTo(_activityDate(a)),
       };
       return comparison == 0 ? stable(a, b) : comparison;
     });
   }
 
   DateTime _activityDate(Offer offer, {bool created = false}) {
-    if (created) return offer.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-    return offer.updatedAt ?? offer.createdAt ??
+    if (created)
+      return offer.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return offer.updatedAt ??
+        offer.createdAt ??
         DateTime.fromMillisecondsSinceEpoch(0);
   }
 
@@ -388,8 +399,8 @@ class OfferStore extends ChangeNotifier {
   }
 
   Future<void> deleteOffers(Set<String> ids) => _batchUpdate(
-        (offers) => offers.removeWhere((offer) => ids.contains(offer.id)),
-      );
+    (offers) => offers.removeWhere((offer) => ids.contains(offer.id)),
+  );
 
   List<Offer> expiredOffersForCleanup(
     ExpiredCleanupRange range, {
@@ -412,18 +423,16 @@ class OfferStore extends ChangeNotifier {
     ExpiredCleanupRange range, {
     DateTime? now,
   }) async {
-    final ids = expiredOffersForCleanup(range, now: now)
-        .map((offer) => offer.id)
-        .toSet();
+    final ids = expiredOffersForCleanup(
+      range,
+      now: now,
+    ).map((offer) => offer.id).toSet();
     if (ids.isEmpty) return 0;
     await deleteOffers(ids);
     return ids.length;
   }
 
-  Future<void> markOffersCompleted(
-    Set<String> ids, {
-    DateTime? completedAt,
-  }) =>
+  Future<void> markOffersCompleted(Set<String> ids, {DateTime? completedAt}) =>
       _batchUpdate((offers) {
         final now = completedAt ?? DateTime.now();
         for (var index = 0; index < offers.length; index++) {
@@ -439,18 +448,18 @@ class OfferStore extends ChangeNotifier {
       });
 
   Future<void> restoreOffers(Set<String> ids) => _batchUpdate((offers) {
-        final now = DateTime.now();
-        for (var index = 0; index < offers.length; index++) {
-          final offer = offers[index];
-          if (ids.contains(offer.id) && offer.isCompleted) {
-            offers[index] = offer.copyWith(
-              status: OfferStatus.active,
-              clearCompletedAt: true,
-              updatedAt: now,
-            );
-          }
-        }
-      });
+    final now = DateTime.now();
+    for (var index = 0; index < offers.length; index++) {
+      final offer = offers[index];
+      if (ids.contains(offer.id) && offer.isCompleted) {
+        offers[index] = offer.copyWith(
+          status: OfferStatus.active,
+          clearCompletedAt: true,
+          updatedAt: now,
+        );
+      }
+    }
+  });
 
   Future<void> _batchUpdate(void Function(List<Offer>) update) async {
     final previous = List<Offer>.from(_offers);
