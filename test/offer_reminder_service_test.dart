@@ -24,10 +24,7 @@ void main() {
         reminderMinute: 30,
       );
 
-      expect(
-        offer.effectiveReminderAt,
-        DateTime(2026, 8, 10 - days, 18, 30),
-      );
+      expect(offer.effectiveReminderAt, DateTime(2026, 8, 10 - days, 18, 30));
     }
   });
 
@@ -100,9 +97,15 @@ void main() {
     );
   });
 
-  test('noop cancellation remains safe when notifications are unavailable', () async {
-    const scheduler = NoopOfferReminderScheduler();
+  test(
+    'noop cancellation remains safe when notifications are unavailable',
+    () async {
+      const scheduler = NoopOfferReminderScheduler();
 
-    await expectLater(scheduler.cancel('offer-without-notifications'), completes);
-  });
+      await expectLater(
+        scheduler.cancel('offer-without-notifications'),
+        completes,
+      );
+    },
+  );
 }

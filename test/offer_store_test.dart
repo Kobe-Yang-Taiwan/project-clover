@@ -52,47 +52,42 @@ void main() {
     expect(store.completedOffers.map((offer) => offer.id), ['newer', 'older']);
   });
 
-  test('restoring a completed offer persists and clears completion time', () async {
-    final storage = MemoryOfferStorage();
-    final store = OfferStore(
-      initialOffers: [
-        Offer(
-          id: 'restore-me',
-          name: '誤標完成',
-          expiresAt: DateTime(2026, 8, 10),
-          status: OfferStatus.completed,
-          completedAt: DateTime(2026, 8, 1, 12),
-        ),
-      ],
-      storage: storage,
-    );
+  test(
+    'restoring a completed offer persists and clears completion time',
+    () async {
+      final storage = MemoryOfferStorage();
+      final store = OfferStore(
+        initialOffers: [
+          Offer(
+            id: 'restore-me',
+            name: '誤標完成',
+            expiresAt: DateTime(2026, 8, 10),
+            status: OfferStatus.completed,
+            completedAt: DateTime(2026, 8, 1, 12),
+          ),
+        ],
+        storage: storage,
+      );
 
-    await store.restoreOffer('restore-me');
-    final reopened = await OfferStore.load(storage: storage);
+      await store.restoreOffer('restore-me');
+      final reopened = await OfferStore.load(storage: storage);
 
-    expect(reopened.completedOffers, isEmpty);
-    expect(reopened.activeOffers.single.id, 'restore-me');
-    expect(reopened.activeOffers.single.completedAt, isNull);
-  });
+      expect(reopened.completedOffers, isEmpty);
+      expect(reopened.activeOffers.single.id, 'restore-me');
+      expect(reopened.activeOffers.single.completedAt, isNull);
+    },
+  );
 
   test('replacing all offers persists restored backup data', () async {
     final storage = MemoryOfferStorage();
     final store = OfferStore(
       initialOffers: [
-        Offer(
-          id: 'old',
-          name: '手機原資料',
-          expiresAt: DateTime(2026, 8, 10),
-        ),
+        Offer(id: 'old', name: '手機原資料', expiresAt: DateTime(2026, 8, 10)),
       ],
       storage: storage,
     );
     final restoredOffers = [
-      Offer(
-        id: 'restored',
-        name: '備份資料',
-        expiresAt: DateTime(2026, 9, 1),
-      ),
+      Offer(id: 'restored', name: '備份資料', expiresAt: DateTime(2026, 9, 1)),
     ];
 
     await store.replaceAll(restoredOffers);
@@ -129,11 +124,7 @@ void main() {
     final storage = MemoryOfferStorage();
     final store = OfferStore(
       initialOffers: [
-        Offer(
-          id: 'edit-me',
-          name: '原名稱',
-          expiresAt: DateTime(2026, 8, 10),
-        ),
+        Offer(id: 'edit-me', name: '原名稱', expiresAt: DateTime(2026, 8, 10)),
       ],
       storage: storage,
     );
@@ -164,11 +155,7 @@ void main() {
     final storage = MemoryOfferStorage();
     final store = OfferStore(
       initialOffers: [
-        Offer(
-          id: 'delete-me',
-          name: '要刪除',
-          expiresAt: DateTime(2026, 8, 10),
-        ),
+        Offer(id: 'delete-me', name: '要刪除', expiresAt: DateTime(2026, 8, 10)),
       ],
       storage: storage,
     );
@@ -247,10 +234,10 @@ void main() {
       ],
     );
 
-    expect(
-      store.queryOffers(query: 'CoFfEe').map((offer) => offer.id),
-      ['title', 'note'],
-    );
+    expect(store.queryOffers(query: 'CoFfEe').map((offer) => offer.id), [
+      'title',
+      'note',
+    ]);
     expect(store.queryOffers(query: 'starbucks').single.id, 'merchant');
     expect(store.queryOffers(query: ''), hasLength(3));
   });
@@ -259,22 +246,14 @@ void main() {
     final now = DateTime(2026, 8, 3, 15);
     final store = OfferStore(
       initialOffers: [
-        Offer(
-          id: 'today',
-          name: '咖啡今天',
-          expiresAt: DateTime(2026, 8, 3),
-        ),
+        Offer(id: 'today', name: '咖啡今天', expiresAt: DateTime(2026, 8, 3)),
         Offer(
           id: 'week',
           name: '咖啡本週',
           expiresAt: DateTime(2026, 8, 9),
           reminderEnabled: false,
         ),
-        Offer(
-          id: 'expired',
-          name: '過期咖啡',
-          expiresAt: DateTime(2026, 8, 2),
-        ),
+        Offer(id: 'expired', name: '過期咖啡', expiresAt: DateTime(2026, 8, 2)),
         Offer(
           id: 'completed',
           name: '咖啡已完成',
@@ -286,11 +265,7 @@ void main() {
 
     expect(
       store
-          .queryOffers(
-            query: '咖啡',
-            filter: OfferFilter.expiringToday,
-            now: now,
-          )
+          .queryOffers(query: '咖啡', filter: OfferFilter.expiringToday, now: now)
           .map((offer) => offer.id),
       ['today'],
     );
@@ -410,11 +385,8 @@ void main() {
 
   test('visual status follows date priority', () {
     final now = DateTime(2026, 8, 3, 12);
-    Offer on(int day) => Offer(
-          id: '$day',
-          name: '$day',
-          expiresAt: DateTime(2026, 8, day),
-        );
+    Offer on(int day) =>
+        Offer(id: '$day', name: '$day', expiresAt: DateTime(2026, 8, day));
 
     expect(on(2).visualStatus(now: now), OfferVisualStatus.expired);
     expect(on(3).visualStatus(now: now), OfferVisualStatus.expiringToday);
@@ -426,42 +398,50 @@ void main() {
     expect(on(7).visualStatus(now: now), OfferVisualStatus.available);
   });
 
-  test('favorite state persists and favorites filter combines with category', () async {
-    final storage = MemoryOfferStorage();
-    final store = OfferStore(
-      initialOffers: [
-        Offer(
-          id: 'coffee',
-          name: '咖啡券',
-          expiresAt: DateTime(2026, 8, 10),
-          category: OfferCategory.coffee,
-        ),
-        Offer(
-          id: 'food',
-          name: '餐券',
-          expiresAt: DateTime(2026, 8, 11),
-          category: OfferCategory.food,
-          isFavorite: true,
-        ),
-      ],
-      storage: storage,
-    );
-
-    await store.toggleFavorite('coffee');
-    final reopened = await OfferStore.load(storage: storage);
-
-    expect(reopened.allOffers.firstWhere((offer) => offer.id == 'coffee').isFavorite, isTrue);
-    expect(
-      reopened
-          .queryOffers(
-            filter: OfferFilter.favorites,
+  test(
+    'favorite state persists and favorites filter combines with category',
+    () async {
+      final storage = MemoryOfferStorage();
+      final store = OfferStore(
+        initialOffers: [
+          Offer(
+            id: 'coffee',
+            name: '咖啡券',
+            expiresAt: DateTime(2026, 8, 10),
             category: OfferCategory.coffee,
-          )
-          .single
-          .id,
-      'coffee',
-    );
-  });
+          ),
+          Offer(
+            id: 'food',
+            name: '餐券',
+            expiresAt: DateTime(2026, 8, 11),
+            category: OfferCategory.food,
+            isFavorite: true,
+          ),
+        ],
+        storage: storage,
+      );
+
+      await store.toggleFavorite('coffee');
+      final reopened = await OfferStore.load(storage: storage);
+
+      expect(
+        reopened.allOffers
+            .firstWhere((offer) => offer.id == 'coffee')
+            .isFavorite,
+        isTrue,
+      );
+      expect(
+        reopened
+            .queryOffers(
+              filter: OfferFilter.favorites,
+              category: OfferCategory.coffee,
+            )
+            .single
+            .id,
+        'coffee',
+      );
+    },
+  );
 
   test('legacy JSON defaults to others category and not favorite', () {
     final offer = Offer.fromJson({
@@ -500,118 +480,141 @@ void main() {
     expect(result.recommendedToday?.id, 'favorite');
     expect(result.expiringToday.map((offer) => offer.id), ['today']);
     expect(result.expiringTomorrow.map((offer) => offer.id), ['tomorrow']);
-    expect(result.mustUseThisWeek.map((offer) => offer.id), ['week', 'favorite']);
+    expect(result.mustUseThisWeek.map((offer) => offer.id), [
+      'week',
+      'favorite',
+    ]);
   });
 
-  test('batch operations persist completion restore and deletion atomically', () async {
-    final storage = MemoryOfferStorage();
-    final store = OfferStore(
-      initialOffers: [
-        Offer(id: 'a', name: 'A', expiresAt: DateTime(2026, 8, 10)),
-        Offer(id: 'b', name: 'B', expiresAt: DateTime(2026, 8, 11)),
-        Offer(id: 'c', name: 'C', expiresAt: DateTime(2026, 8, 12)),
-      ],
-      storage: storage,
-    );
+  test(
+    'batch operations persist completion restore and deletion atomically',
+    () async {
+      final storage = MemoryOfferStorage();
+      final store = OfferStore(
+        initialOffers: [
+          Offer(id: 'a', name: 'A', expiresAt: DateTime(2026, 8, 10)),
+          Offer(id: 'b', name: 'B', expiresAt: DateTime(2026, 8, 11)),
+          Offer(id: 'c', name: 'C', expiresAt: DateTime(2026, 8, 12)),
+        ],
+        storage: storage,
+      );
 
-    await store.markOffersCompleted({'a', 'b'}, completedAt: DateTime(2026, 8, 3));
-    expect(store.completedOffers.map((offer) => offer.id).toSet(), {'a', 'b'});
+      await store.markOffersCompleted({
+        'a',
+        'b',
+      }, completedAt: DateTime(2026, 8, 3));
+      expect(store.completedOffers.map((offer) => offer.id).toSet(), {
+        'a',
+        'b',
+      });
 
-    await store.restoreOffers({'a'});
-    expect(store.activeOffers.map((offer) => offer.id).toSet(), {'a', 'c'});
-    expect(store.allOffers.firstWhere((offer) => offer.id == 'a').completedAt, isNull);
+      await store.restoreOffers({'a'});
+      expect(store.activeOffers.map((offer) => offer.id).toSet(), {'a', 'c'});
+      expect(
+        store.allOffers.firstWhere((offer) => offer.id == 'a').completedAt,
+        isNull,
+      );
 
-    await store.deleteOffers({'b', 'c'});
-    final reopened = await OfferStore.load(storage: storage);
-    expect(reopened.allOffers.single.id, 'a');
-  });
+      await store.deleteOffers({'b', 'c'});
+      final reopened = await OfferStore.load(storage: storage);
+      expect(reopened.allOffers.single.id, 'a');
+    },
+  );
 
-  test('new coupons inherit persisted reminder defaults without changing existing coupons', () async {
-    final storage = MemoryOfferStorage();
-    final reminderSettings = MemoryReminderDefaultsStorage();
-    final existing = Offer(
-      id: 'existing',
-      name: '現有優惠',
-      expiresAt: DateTime(2026, 9, 30),
-      reminderEnabled: true,
-      reminderDaysBefore: 1,
-      reminderHour: 9,
-    );
-    final store = OfferStore(
-      initialOffers: [existing],
-      storage: storage,
-      reminderDefaultsStorage: reminderSettings,
-    );
+  test(
+    'new coupons inherit persisted reminder defaults without changing existing coupons',
+    () async {
+      final storage = MemoryOfferStorage();
+      final reminderSettings = MemoryReminderDefaultsStorage();
+      final existing = Offer(
+        id: 'existing',
+        name: '現有優惠',
+        expiresAt: DateTime(2026, 9, 30),
+        reminderEnabled: true,
+        reminderDaysBefore: 1,
+        reminderHour: 9,
+      );
+      final store = OfferStore(
+        initialOffers: [existing],
+        storage: storage,
+        reminderDefaultsStorage: reminderSettings,
+      );
 
-    await store.setReminderDefaults(
-      const ReminderDefaults(
-        enabled: false,
-        daysBefore: 7,
-        hour: 18,
-        minute: 30,
-      ),
-    );
-    await store.addOffer(name: '新優惠', expiresAt: DateTime(2026, 10, 31));
-
-    final unchanged = store.allOffers.firstWhere((offer) => offer.id == 'existing');
-    final added = store.allOffers.firstWhere((offer) => offer.name == '新優惠');
-    expect(unchanged.reminderEnabled, isTrue);
-    expect(unchanged.reminderDaysBefore, 1);
-    expect(unchanged.reminderHour, 9);
-    expect(added.reminderEnabled, isFalse);
-    expect(added.reminderDaysBefore, 7);
-    expect(added.reminderHour, 18);
-    expect(added.reminderMinute, 30);
-
-    final reopened = await OfferStore.load(
-      storage: storage,
-      reminderDefaultsStorage: reminderSettings,
-    );
-    expect(reopened.reminderDefaults.enabled, isFalse);
-    expect(reopened.reminderDefaults.daysBefore, 7);
-    expect(reopened.reminderDefaults.hour, 18);
-    expect(reopened.reminderDefaults.minute, 30);
-  });
-
-  test('expired cleanup uses strict age boundaries and keeps completed history', () async {
-    final store = OfferStore(
-      initialOffers: [
-        Offer(id: '29', name: '29 天', expiresAt: DateTime(2026, 7, 5)),
-        Offer(id: '30', name: '30 天', expiresAt: DateTime(2026, 7, 4)),
-        Offer(id: '31', name: '31 天', expiresAt: DateTime(2026, 7, 3)),
-        Offer(id: '91', name: '91 天', expiresAt: DateTime(2026, 5, 4)),
-        Offer(
-          id: 'completed-old',
-          name: '已完成舊優惠',
-          expiresAt: DateTime(2025, 1, 1),
-          status: OfferStatus.completed,
+      await store.setReminderDefaults(
+        const ReminderDefaults(
+          enabled: false,
+          daysBefore: 7,
+          hour: 18,
+          minute: 30,
         ),
-      ],
-    );
-    final now = DateTime(2026, 8, 3, 23, 59);
+      );
+      await store.addOffer(name: '新優惠', expiresAt: DateTime(2026, 10, 31));
 
-    expect(
-      store
-          .expiredOffersForCleanup(
-            ExpiredCleanupRange.olderThan30Days,
-            now: now,
-          )
-          .map((offer) => offer.id)
-          .toSet(),
-      {'31', '91'},
-    );
-    final deleted = await store.cleanupExpiredOffers(
-      ExpiredCleanupRange.olderThan30Days,
-      now: now,
-    );
+      final unchanged = store.allOffers.firstWhere(
+        (offer) => offer.id == 'existing',
+      );
+      final added = store.allOffers.firstWhere((offer) => offer.name == '新優惠');
+      expect(unchanged.reminderEnabled, isTrue);
+      expect(unchanged.reminderDaysBefore, 1);
+      expect(unchanged.reminderHour, 9);
+      expect(added.reminderEnabled, isFalse);
+      expect(added.reminderDaysBefore, 7);
+      expect(added.reminderHour, 18);
+      expect(added.reminderMinute, 30);
 
-    expect(deleted, 2);
-    expect(store.allOffers.map((offer) => offer.id).toSet(), {
-      '29',
-      '30',
-      'completed-old',
-    });
-  });
+      final reopened = await OfferStore.load(
+        storage: storage,
+        reminderDefaultsStorage: reminderSettings,
+      );
+      expect(reopened.reminderDefaults.enabled, isFalse);
+      expect(reopened.reminderDefaults.daysBefore, 7);
+      expect(reopened.reminderDefaults.hour, 18);
+      expect(reopened.reminderDefaults.minute, 30);
+    },
+  );
+
+  test(
+    'expired cleanup uses strict age boundaries and keeps completed history',
+    () async {
+      final store = OfferStore(
+        initialOffers: [
+          Offer(id: '29', name: '29 天', expiresAt: DateTime(2026, 7, 5)),
+          Offer(id: '30', name: '30 天', expiresAt: DateTime(2026, 7, 4)),
+          Offer(id: '31', name: '31 天', expiresAt: DateTime(2026, 7, 3)),
+          Offer(id: '91', name: '91 天', expiresAt: DateTime(2026, 5, 4)),
+          Offer(
+            id: 'completed-old',
+            name: '已完成舊優惠',
+            expiresAt: DateTime(2025, 1, 1),
+            status: OfferStatus.completed,
+          ),
+        ],
+      );
+      final now = DateTime(2026, 8, 3, 23, 59);
+
+      expect(
+        store
+            .expiredOffersForCleanup(
+              ExpiredCleanupRange.olderThan30Days,
+              now: now,
+            )
+            .map((offer) => offer.id)
+            .toSet(),
+        {'31', '91'},
+      );
+      final deleted = await store.cleanupExpiredOffers(
+        ExpiredCleanupRange.olderThan30Days,
+        now: now,
+      );
+
+      expect(deleted, 2);
+      expect(store.allOffers.map((offer) => offer.id).toSet(), {
+        '29',
+        '30',
+        'completed-old',
+      });
+    },
+  );
 
   test('all cleanup ranges select only their intended expired offers', () {
     final now = DateTime(2026, 8, 4);

@@ -50,10 +50,7 @@ class NoopOfferReminderScheduler implements OfferReminderScheduler {
 }
 
 class AndroidOfferReminderScheduler implements OfferReminderScheduler {
-  AndroidOfferReminderScheduler._(
-    this._notifications,
-    this.initialOfferId,
-  );
+  AndroidOfferReminderScheduler._(this._notifications, this.initialOfferId);
 
   static const _details = NotificationDetails(
     android: AndroidNotificationDetails(
@@ -89,28 +86,28 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler {
         }
       },
     );
-    final launchDetails =
-        await notifications.getNotificationAppLaunchDetails();
+    final launchDetails = await notifications.getNotificationAppLaunchDetails();
     final initialOfferId = launchDetails?.didNotificationLaunchApp ?? false
         ? launchDetails?.notificationResponse?.payload
         : null;
-    return AndroidOfferReminderScheduler._(
-      notifications,
-      initialOfferId,
-    );
+    return AndroidOfferReminderScheduler._(notifications, initialOfferId);
   }
 
   @override
   Future<bool> requestPermission() async {
-    final android = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     return await android?.requestNotificationsPermission() ?? true;
   }
 
   @override
   Future<NotificationPermissionState> permissionState() async {
-    final android = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     final enabled = await android?.areNotificationsEnabled();
     return switch (enabled) {
       true => NotificationPermissionState.granted,

@@ -27,23 +27,24 @@ class DiagnosticInfo {
   final int databaseVersion;
 
   String get notificationPermissionLabel => switch (notificationPermission) {
-        NotificationPermissionState.granted => 'granted',
-        NotificationPermissionState.denied => 'denied',
-        NotificationPermissionState.unknown => 'unknown',
-      };
+    NotificationPermissionState.granted => 'granted',
+    NotificationPermissionState.denied => 'denied',
+    NotificationPermissionState.unknown => 'unknown',
+  };
 
   Map<String, Object> toJson() => {
-        'appVersion': appVersion,
-        'buildNumber': buildNumber,
-        'androidVersion': androidVersion,
-        'deviceInformation': deviceInformation,
-        'notificationPermission': notificationPermissionLabel,
-        'databaseVersion': databaseVersion,
-      };
+    'appVersion': appVersion,
+    'buildNumber': buildNumber,
+    'androidVersion': androidVersion,
+    'deviceInformation': deviceInformation,
+    'notificationPermission': notificationPermissionLabel,
+    'databaseVersion': databaseVersion,
+  };
 
   String toPrettyJson() => const JsonEncoder.withIndent('  ').convert(toJson());
 
-  String toFeedbackBody() => '''
+  String toFeedbackBody() =>
+      '''
 請描述發生的問題或建議：
 
 
@@ -61,9 +62,8 @@ abstract interface class DiagnosticInfoProvider {
 }
 
 class AndroidDiagnosticInfoProvider implements DiagnosticInfoProvider {
-  AndroidDiagnosticInfoProvider({
-    DeviceInfoPlugin? deviceInfo,
-  }) : _deviceInfo = deviceInfo ?? DeviceInfoPlugin();
+  AndroidDiagnosticInfoProvider({DeviceInfoPlugin? deviceInfo})
+    : _deviceInfo = deviceInfo ?? DeviceInfoPlugin();
 
   final DeviceInfoPlugin _deviceInfo;
 
@@ -84,9 +84,10 @@ class AndroidDiagnosticInfoProvider implements DiagnosticInfoProvider {
       buildNumber: packageInfo.buildNumber,
       androidVersion:
           '${android.version.release} (SDK ${android.version.sdkInt})',
-      deviceInformation: [manufacturer, model]
-          .where((value) => value.isNotEmpty)
-          .join(' '),
+      deviceInformation: [
+        manufacturer,
+        model,
+      ].where((value) => value.isNotEmpty).join(' '),
       notificationPermission: permission,
     );
   }
@@ -100,7 +101,8 @@ class FilePickerDiagnosticExportService implements DiagnosticExportService {
   @override
   Future<bool> export(DiagnosticInfo info) async {
     final now = DateTime.now();
-    final date = '${now.year}'
+    final date =
+        '${now.year}'
         '${now.month.toString().padLeft(2, '0')}'
         '${now.day.toString().padLeft(2, '0')}';
     final path = await FilePicker.platform.saveFile(

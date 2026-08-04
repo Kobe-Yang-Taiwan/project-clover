@@ -208,7 +208,8 @@ class _CloverHomeState extends State<CloverHome> {
           ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: currentIndex,
-            onDestinationSelected: (index) => setState(() => currentIndex = index),
+            onDestinationSelected: (index) =>
+                setState(() => currentIndex = index),
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.today_outlined),
@@ -249,9 +250,9 @@ class _CloverHomeState extends State<CloverHome> {
       );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('目前無法讀取軟體版本')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('目前無法讀取軟體版本')));
     }
   }
 
@@ -312,10 +313,14 @@ class _CloverHomeState extends State<CloverHome> {
 
   Future<void> _exportBackup() async {
     final now = DateTime.now();
-    final date = '${now.year}'
+    final date =
+        '${now.year}'
         '${now.month.toString().padLeft(2, '0')}'
         '${now.day.toString().padLeft(2, '0')}';
-    final content = OfferBackupCodec.encode(widget.store.allOffers, exportedAt: now);
+    final content = OfferBackupCodec.encode(
+      widget.store.allOffers,
+      exportedAt: now,
+    );
     try {
       final saved = await widget.backupFiles.saveBackup(
         fileName: 'project-clover-backup-$date.json',
@@ -327,9 +332,9 @@ class _CloverHomeState extends State<CloverHome> {
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('備份失敗，請稍後再試')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('備份失敗，請稍後再試')));
     }
   }
 
@@ -381,24 +386,22 @@ class _CloverHomeState extends State<CloverHome> {
       );
     } on FormatException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.message.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message.toString())));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('還原失敗，請確認備份檔是否正確')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('還原失敗，請確認備份檔是否正確')));
     }
   }
 
   Future<void> _openAddOffer(BuildContext context) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => AddOfferScreen(
-          store: widget.store,
-          reminders: widget.reminders,
-        ),
+        builder: (_) =>
+            AddOfferScreen(store: widget.store, reminders: widget.reminders),
       ),
     );
   }
@@ -578,14 +581,14 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
         ),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已儲存；現有優惠維持原設定')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已儲存；現有優惠維持原設定')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('無法儲存提醒預設')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('無法儲存提醒預設')));
     } finally {
       if (mounted) setState(() => isBusy = false);
     }
@@ -619,9 +622,9 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
     if (!mounted || range == null) return;
     final count = widget.store.expiredOffersForCleanup(range).length;
     if (count == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('沒有符合條件的過期優惠')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('沒有符合條件的過期優惠')));
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -660,17 +663,15 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            reminderSynced
-                ? '已刪除 $count 張過期優惠'
-                : '已刪除 $count 張優惠，但提醒同步失敗',
+            reminderSynced ? '已刪除 $count 張過期優惠' : '已刪除 $count 張優惠，但提醒同步失敗',
           ),
         ),
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('清理失敗，資料未變更')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('清理失敗，資料未變更')));
     } finally {
       if (mounted) setState(() => isBusy = false);
     }
@@ -679,17 +680,19 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
   Future<void> _sendFeedback() async {
     setState(() => isBusy = true);
     try {
-      final info = await widget.diagnosticInfoProvider.collect(widget.reminders);
+      final info = await widget.diagnosticInfoProvider.collect(
+        widget.reminders,
+      );
       final opened = await widget.feedbackLauncher.open(info);
       if (!mounted || opened) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('找不到可用的 Email App')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('找不到可用的 Email App')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('目前無法開啟回饋 Email')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('目前無法開啟回饋 Email')));
     } finally {
       if (mounted) setState(() => isBusy = false);
     }
@@ -698,28 +701,30 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
   Future<void> _exportDiagnostic() async {
     setState(() => isBusy = true);
     try {
-      final info = await widget.diagnosticInfoProvider.collect(widget.reminders);
+      final info = await widget.diagnosticInfoProvider.collect(
+        widget.reminders,
+      );
       final exported = await widget.diagnosticExportService.export(info);
       if (!mounted || !exported) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('診斷資訊已匯出')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('診斷資訊已匯出')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('診斷資訊匯出失敗')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('診斷資訊匯出失敗')));
     } finally {
       if (mounted) setState(() => isBusy = false);
     }
   }
 
   String _cleanupLabel(ExpiredCleanupRange value) => switch (value) {
-        ExpiredCleanupRange.olderThan30Days => '刪除超過 30 天的過期優惠',
-        ExpiredCleanupRange.olderThan90Days => '刪除超過 90 天的過期優惠',
-        ExpiredCleanupRange.olderThanOneYear => '刪除超過 1 年的過期優惠',
-        ExpiredCleanupRange.all => '刪除全部過期優惠',
-      };
+    ExpiredCleanupRange.olderThan30Days => '刪除超過 30 天的過期優惠',
+    ExpiredCleanupRange.olderThan90Days => '刪除超過 90 天的過期優惠',
+    ExpiredCleanupRange.olderThanOneYear => '刪除超過 1 年的過期優惠',
+    ExpiredCleanupRange.all => '刪除全部過期優惠',
+  };
 }
 
 class _SettingsSectionHeader extends StatelessWidget {
@@ -774,10 +779,11 @@ class TodayScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final summary = store.dashboard();
     final myDay = store.myDay();
-    final favorites = store.allOffers
-        .where((offer) => offer.isFavorite && !offer.isCompleted)
-        .toList()
-      ..sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
+    final favorites =
+        store.allOffers
+            .where((offer) => offer.isFavorite && !offer.isCompleted)
+            .toList()
+          ..sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
     if (store.allOffers.isEmpty) {
       return _FirstExperience(onAddOffer: onAddOffer);
     }
@@ -793,7 +799,10 @@ class TodayScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('My Day｜我的今天', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'My Day｜我的今天',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 8),
               Text(
                 myDay.recommendedToday == null
@@ -914,7 +923,9 @@ class _OfferSection extends StatelessWidget {
           if (offers.isEmpty)
             Text(emptyMessage, style: Theme.of(context).textTheme.bodySmall)
           else
-            ...offers.take(5).map(
+            ...offers
+                .take(5)
+                .map(
                   (offer) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: OfferCard(
@@ -979,11 +990,7 @@ class _FirstExperience extends StatelessWidget {
 }
 
 class _DashboardMetric extends StatelessWidget {
-  const _DashboardMetric({
-    required this.label,
-    required this.value,
-    super.key,
-  });
+  const _DashboardMetric({required this.label, required this.value, super.key});
 
   final String label;
   final int value;
@@ -999,9 +1006,9 @@ class _DashboardMetric extends StatelessWidget {
             Text(
               '$value',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w800,
-                  ),
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(child: Text(label)),
@@ -1120,9 +1127,9 @@ class _OfferListScreenState extends State<OfferListScreen> {
                     await widget.store.setSortOption(value);
                   } catch (_) {
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('無法儲存排序設定')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('無法儲存排序設定')));
                   }
                 },
               ),
@@ -1215,23 +1222,23 @@ class _OfferListScreenState extends State<OfferListScreen> {
   }
 
   String _filterLabel(OfferFilter value) => switch (value) {
-        OfferFilter.all => '全部',
-        OfferFilter.expiringToday => '今天到期',
-        OfferFilter.expiringWithinSevenDays => '7 天內到期',
-        OfferFilter.expired => '已過期',
-        OfferFilter.completed => '已完成',
-        OfferFilter.reminderEnabled => '提醒開啟',
-        OfferFilter.reminderDisabled => '提醒關閉',
-        OfferFilter.favorites => '我的收藏',
-      };
+    OfferFilter.all => '全部',
+    OfferFilter.expiringToday => '今天到期',
+    OfferFilter.expiringWithinSevenDays => '7 天內到期',
+    OfferFilter.expired => '已過期',
+    OfferFilter.completed => '已完成',
+    OfferFilter.reminderEnabled => '提醒開啟',
+    OfferFilter.reminderDisabled => '提醒關閉',
+    OfferFilter.favorites => '我的收藏',
+  };
 
   String _sortLabel(OfferSortOption value) => switch (value) {
-        OfferSortOption.expirationAscending => '到期日近→遠',
-        OfferSortOption.expirationDescending => '到期日遠→近',
-        OfferSortOption.createdNewest => '最新建立',
-        OfferSortOption.createdOldest => '最早建立',
-        OfferSortOption.recentlyModified => '最近修改',
-      };
+    OfferSortOption.expirationAscending => '到期日近→遠',
+    OfferSortOption.expirationDescending => '到期日遠→近',
+    OfferSortOption.createdNewest => '最新建立',
+    OfferSortOption.createdOldest => '最早建立',
+    OfferSortOption.recentlyModified => '最近修改',
+  };
 
   void _toggleSelected(String id) {
     setState(() {
@@ -1286,14 +1293,14 @@ class _OfferListScreenState extends State<OfferListScreen> {
         selectedIds.clear();
         selectionMode = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已完成 ${ids.length} 張優惠的批次操作')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已完成 ${ids.length} 張優惠的批次操作')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('批次操作失敗，資料未變更')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('批次操作失敗，資料未變更')));
     }
   }
 }
@@ -1426,7 +1433,8 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
               key: const Key('offer-name-field'),
               controller: nameController,
               decoration: const InputDecoration(labelText: '優惠名稱 *'),
-              validator: (value) => value == null || value.trim().isEmpty ? '請輸入優惠名稱' : null,
+              validator: (value) =>
+                  value == null || value.trim().isEmpty ? '請輸入優惠名稱' : null,
             ),
             const SizedBox(height: 16),
             InkWell(
@@ -1435,9 +1443,13 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
               child: InputDecorator(
                 decoration: InputDecoration(
                   labelText: '到期日 *',
-                  errorText: expiresAt == null && attemptedSubmit ? '請選擇到期日' : null,
+                  errorText: expiresAt == null && attemptedSubmit
+                      ? '請選擇到期日'
+                      : null,
                 ),
-                child: Text(expiresAt == null ? '選擇日期' : formatTaiwanDate(expiresAt!)),
+                child: Text(
+                  expiresAt == null ? '選擇日期' : formatTaiwanDate(expiresAt!),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -1470,11 +1482,7 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
               key: const Key('reminder-switch'),
               contentPadding: EdgeInsets.zero,
               title: const Text('到期提醒'),
-              subtitle: Text(
-                reminderEnabled
-                    ? '在指定時間發送手機通知'
-                    : '不發送這張優惠的通知',
-              ),
+              subtitle: Text(reminderEnabled ? '在指定時間發送手機通知' : '不發送這張優惠的通知'),
               value: reminderEnabled,
               onChanged: (value) {
                 setState(() {
@@ -1548,8 +1556,8 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
                 isSaving
                     ? '儲存中…'
                     : isEditing
-                        ? '儲存變更'
-                        : '儲存優惠',
+                    ? '儲存變更'
+                    : '儲存優惠',
               ),
             ),
           ],
@@ -1605,7 +1613,8 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
 
   Future<void> _save() async {
     setState(() => attemptedSubmit = true);
-    if (!(formKey.currentState?.validate() ?? false) || expiresAt == null) return;
+    if (!(formKey.currentState?.validate() ?? false) || expiresAt == null)
+      return;
 
     if (reminderEnabled && !_selectedReminderAt().isAfter(DateTime.now())) {
       setState(
@@ -1671,24 +1680,20 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
       if (reminderFailed) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('優惠已儲存，但提醒設定失敗')),
-        );
+        messenger.showSnackBar(const SnackBar(content: Text('優惠已儲存，但提醒設定失敗')));
       } else if (reminderPermissionDenied) {
         messenger.showSnackBar(
           const SnackBar(content: Text('優惠已儲存；允許通知後才會收到提醒')),
         );
       } else if (isEditing) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('優惠已更新')),
-        );
+        messenger.showSnackBar(const SnackBar(content: Text('優惠已更新')));
       }
     } catch (_) {
       if (!mounted) return;
       setState(() => isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('儲存失敗，請稍後再試')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
     }
   }
 }
@@ -1726,23 +1731,31 @@ class OfferDetailsScreen extends StatelessWidget {
                 color: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(height: 20),
-              Text(offer.name, style: Theme.of(context).textTheme.headlineSmall),
+              Text(
+                offer.name,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
               const SizedBox(height: 24),
-              _DetailRow(label: '到期日', value: formatTaiwanDate(offer.expiresAt)),
-              _DetailRow(label: '分類', value: offerCategoryLabel(offer.category)),
+              _DetailRow(
+                label: '到期日',
+                value: formatTaiwanDate(offer.expiresAt),
+              ),
+              _DetailRow(
+                label: '分類',
+                value: offerCategoryLabel(offer.category),
+              ),
               _DetailRow(label: '收藏', value: offer.isFavorite ? '已收藏' : '未收藏'),
               _DetailRow(
                 label: '提醒',
                 value: offer.reminderEnabled
                     ? '提前 ${offer.reminderDaysBefore} 天・'
-                        '${formatTaiwanTime(TimeOfDay(
-                          hour: offer.reminderHour,
-                          minute: offer.reminderMinute,
-                        ))}'
+                          '${formatTaiwanTime(TimeOfDay(hour: offer.reminderHour, minute: offer.reminderMinute))}'
                     : '已關閉',
               ),
-              if (offer.source.isNotEmpty) _DetailRow(label: '來源', value: offer.source),
-              if (offer.note.isNotEmpty) _DetailRow(label: '備註', value: offer.note),
+              if (offer.source.isNotEmpty)
+                _DetailRow(label: '來源', value: offer.source),
+              if (offer.note.isNotEmpty)
+                _DetailRow(label: '備註', value: offer.note),
               if (offer.isCompleted)
                 _DetailRow(
                   label: '完成時間',
@@ -1817,11 +1830,8 @@ class OfferDetailsScreen extends StatelessWidget {
   Future<void> _editOffer(BuildContext context, Offer offer) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => AddOfferScreen(
-          store: store,
-          reminders: reminders,
-          offer: offer,
-        ),
+        builder: (_) =>
+            AddOfferScreen(store: store, reminders: reminders, offer: offer),
       ),
     );
   }
@@ -1857,13 +1867,9 @@ class OfferDetailsScreen extends StatelessWidget {
       }
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('優惠已刪除')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('優惠已刪除')));
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('刪除失敗，請稍後再試')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('刪除失敗，請稍後再試')));
     }
   }
 
@@ -1878,13 +1884,9 @@ class OfferDetailsScreen extends StatelessWidget {
       }
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('已恢復為待使用優惠')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('已恢復為待使用優惠')));
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('恢復失敗，請稍後再試')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('恢復失敗，請稍後再試')));
     }
   }
 }
@@ -1903,7 +1905,12 @@ class _DetailRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(width: 72, child: Text(label)),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
         ],
       ),
     );
@@ -1962,16 +1969,16 @@ String formatTaiwanTime(TimeOfDay value) {
 }
 
 String offerCategoryLabel(OfferCategory value) => switch (value) {
-      OfferCategory.food => '餐飲',
-      OfferCategory.coffee => '咖啡',
-      OfferCategory.convenienceStore => '便利商店',
-      OfferCategory.departmentStore => '百貨公司',
-      OfferCategory.onlineShopping => '線上購物',
-      OfferCategory.entertainment => '娛樂',
-      OfferCategory.travel => '旅遊',
-      OfferCategory.transportation => '交通',
-      OfferCategory.others => '其他',
-    };
+  OfferCategory.food => '餐飲',
+  OfferCategory.coffee => '咖啡',
+  OfferCategory.convenienceStore => '便利商店',
+  OfferCategory.departmentStore => '百貨公司',
+  OfferCategory.onlineShopping => '線上購物',
+  OfferCategory.entertainment => '娛樂',
+  OfferCategory.travel => '旅遊',
+  OfferCategory.transportation => '交通',
+  OfferCategory.others => '其他',
+};
 
 extension _FirstOrNull<E> on Iterable<E> {
   E? get firstOrNull => isEmpty ? null : first;

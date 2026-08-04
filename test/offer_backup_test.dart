@@ -45,7 +45,8 @@ void main() {
 
   test('backup rejects unrelated JSON', () {
     expect(
-      () => OfferBackupCodec.decode('{"schema":"other","version":1,"offers":[]}'),
+      () =>
+          OfferBackupCodec.decode('{"schema":"other","version":1,"offers":[]}'),
       throwsFormatException,
     );
   });
@@ -56,10 +57,10 @@ void main() {
       name: '重複優惠',
       expiresAt: DateTime(2026, 8, 10),
     );
-    final encoded = OfferBackupCodec.encode(
-      [offer, offer],
-      exportedAt: DateTime(2026, 8, 1),
-    );
+    final encoded = OfferBackupCodec.encode([
+      offer,
+      offer,
+    ], exportedAt: DateTime(2026, 8, 1));
 
     expect(() => OfferBackupCodec.decode(encoded), throwsFormatException);
   });
@@ -99,28 +100,27 @@ void main() {
     expect(offer.category, OfferCategory.food);
   });
 
-  test('V0.8 through V0.11 backups can replace and persist current data', () async {
-    for (final version in ['0.8', '0.9', '0.10', '0.11']) {
-      final storage = _MemoryStorage();
-      final store = OfferStore(
-        initialOffers: [
-          Offer(
-            id: 'phone',
-            name: '手機資料',
-            expiresAt: DateTime(2026, 8, 31),
-          ),
-        ],
-        storage: storage,
-      );
-      final backup = OfferBackupCodec.decode(_backupFor(version));
+  test(
+    'V0.8 through V0.11 backups can replace and persist current data',
+    () async {
+      for (final version in ['0.8', '0.9', '0.10', '0.11']) {
+        final storage = _MemoryStorage();
+        final store = OfferStore(
+          initialOffers: [
+            Offer(id: 'phone', name: '手機資料', expiresAt: DateTime(2026, 8, 31)),
+          ],
+          storage: storage,
+        );
+        final backup = OfferBackupCodec.decode(_backupFor(version));
 
-      await store.replaceAll(backup.offers);
-      final reopened = await OfferStore.load(storage: storage);
+        await store.replaceAll(backup.offers);
+        final reopened = await OfferStore.load(storage: storage);
 
-      expect(reopened.allOffers.single.id, 'v$version');
-      expect(reopened.allOffers.single.name, 'V$version 優惠');
-    }
-  });
+        expect(reopened.allOffers.single.id, 'v$version');
+        expect(reopened.allOffers.single.name, 'V$version 優惠');
+      }
+    },
+  );
 }
 
 String _backupFor(String appVersion) {

@@ -29,7 +29,9 @@ void main() {
     expect(find.text('09:00'), findsOneWidget);
   });
 
-  testWidgets('notification launch opens the matching offer details', (tester) async {
+  testWidgets('notification launch opens the matching offer details', (
+    tester,
+  ) async {
     final store = OfferStore(
       initialOffers: [
         Offer(
@@ -74,23 +76,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('編輯優惠'), findsOneWidget);
-    await tester.enterText(
-      find.byKey(const Key('offer-name-field')),
-      '編輯後名稱',
-    );
+    await tester.enterText(find.byKey(const Key('offer-name-field')), '編輯後名稱');
     final saveButton = find.byKey(const Key('save-offer-button'));
     await tester.scrollUntilVisible(
       saveButton,
       300,
-      scrollable: find.descendant(
-        of: find.byType(ListView),
-        matching: find.byType(Scrollable),
-      ).first,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
-    await tester.drag(
-      find.byType(ListView),
-      const Offset(0, -200),
-    );
+    await tester.drag(find.byType(ListView), const Offset(0, -200));
     await tester.pumpAndSettle();
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
@@ -180,16 +178,10 @@ void main() {
     final backupFiles = FakeBackupFileService();
     final store = OfferStore(
       initialOffers: [
-        Offer(
-          id: 'exported',
-          name: '要備份的優惠',
-          expiresAt: DateTime(2026, 9, 1),
-        ),
+        Offer(id: 'exported', name: '要備份的優惠', expiresAt: DateTime(2026, 9, 1)),
       ],
     );
-    await tester.pumpWidget(
-      CloverApp(store: store, backupFiles: backupFiles),
-    );
+    await tester.pumpWidget(CloverApp(store: store, backupFiles: backupFiles));
 
     await tester.tap(find.byKey(const Key('backup-button')));
     await tester.pumpAndSettle();
@@ -202,34 +194,27 @@ void main() {
     expect(find.text('已備份 1 筆優惠'), findsOneWidget);
   });
 
-  testWidgets('restoring backup requires confirmation and replaces data', (tester) async {
+  testWidgets('restoring backup requires confirmation and replaces data', (
+    tester,
+  ) async {
     final backupFiles = FakeBackupFileService(
       importedFile: OfferBackupFile(
         name: 'project-clover-backup.json',
-        content: OfferBackupCodec.encode(
-          [
-            Offer(
-              id: 'from-backup',
-              name: '備份內優惠',
-              expiresAt: DateTime(2026, 9, 1),
-            ),
-          ],
-          exportedAt: DateTime(2026, 8, 1, 20, 30),
-        ),
+        content: OfferBackupCodec.encode([
+          Offer(
+            id: 'from-backup',
+            name: '備份內優惠',
+            expiresAt: DateTime(2026, 9, 1),
+          ),
+        ], exportedAt: DateTime(2026, 8, 1, 20, 30)),
       ),
     );
     final store = OfferStore(
       initialOffers: [
-        Offer(
-          id: 'on-phone',
-          name: '手機原優惠',
-          expiresAt: DateTime(2026, 8, 10),
-        ),
+        Offer(id: 'on-phone', name: '手機原優惠', expiresAt: DateTime(2026, 8, 10)),
       ],
     );
-    await tester.pumpWidget(
-      CloverApp(store: store, backupFiles: backupFiles),
-    );
+    await tester.pumpWidget(CloverApp(store: store, backupFiles: backupFiles));
 
     await tester.tap(find.byKey(const Key('backup-button')));
     await tester.pumpAndSettle();
@@ -330,42 +315,45 @@ void main() {
     );
   });
 
-  testWidgets('beta support opens feedback and exports diagnostic information', (
-    tester,
-  ) async {
-    final provider = FakeDiagnosticInfoProvider();
-    final feedback = FakeFeedbackLauncher();
-    final exporter = FakeDiagnosticExportService();
-    await tester.pumpWidget(
-      CloverApp(
-        store: OfferStore(initialOffers: []),
-        diagnosticInfoProvider: provider,
-        feedbackLauncher: feedback,
-        diagnosticExportService: exporter,
-      ),
-    );
+  testWidgets(
+    'beta support opens feedback and exports diagnostic information',
+    (tester) async {
+      final provider = FakeDiagnosticInfoProvider();
+      final feedback = FakeFeedbackLauncher();
+      final exporter = FakeDiagnosticExportService();
+      await tester.pumpWidget(
+        CloverApp(
+          store: OfferStore(initialOffers: []),
+          diagnosticInfoProvider: provider,
+          feedbackLauncher: feedback,
+          diagnosticExportService: exporter,
+        ),
+      );
 
-    await tester.tap(find.byKey(const Key('settings-button')));
-    await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView), const Offset(0, -650));
-    await tester.pumpAndSettle();
-    final sendFeedback = find.byKey(const Key('send-feedback-button'));
-    await tester.ensureVisible(sendFeedback);
-    await tester.tap(sendFeedback);
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('settings-button')));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView), const Offset(0, -650));
+      await tester.pumpAndSettle();
+      final sendFeedback = find.byKey(const Key('send-feedback-button'));
+      await tester.ensureVisible(sendFeedback);
+      await tester.tap(sendFeedback);
+      await tester.pumpAndSettle();
 
-    expect(feedback.openedInfo, same(provider.info));
-    expect(provider.collectCount, 1);
+      expect(feedback.openedInfo, same(provider.info));
+      expect(provider.collectCount, 1);
 
-    final exportDiagnostic = find.byKey(const Key('export-diagnostic-button'));
-    await tester.ensureVisible(exportDiagnostic);
-    await tester.tap(exportDiagnostic);
-    await tester.pumpAndSettle();
+      final exportDiagnostic = find.byKey(
+        const Key('export-diagnostic-button'),
+      );
+      await tester.ensureVisible(exportDiagnostic);
+      await tester.tap(exportDiagnostic);
+      await tester.pumpAndSettle();
 
-    expect(exporter.exportedInfo, same(provider.info));
-    expect(provider.collectCount, 2);
-    expect(find.text('診斷資訊已匯出'), findsOneWidget);
-  });
+      expect(exporter.exportedInfo, same(provider.info));
+      expect(provider.collectCount, 2);
+      expect(find.text('診斷資訊已匯出'), findsOneWidget);
+    },
+  );
 
   testWidgets('expired cleanup requires confirmation before deleting', (
     tester,
@@ -375,8 +363,11 @@ void main() {
     final oldOffer = Offer(
       id: 'old-expired',
       name: '很久以前的優惠',
-      expiresAt: DateTime(now.year, now.month, now.day)
-          .subtract(const Duration(days: 31)),
+      expiresAt: DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(const Duration(days: 31)),
     );
     final store = OfferStore(initialOffers: [oldOffer]);
     await tester.pumpWidget(CloverApp(store: store, reminders: reminders));
@@ -389,17 +380,13 @@ void main() {
     await tester.ensureVisible(cleanupButton);
     await tester.tap(cleanupButton);
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('cleanup-olderThan30Days')),
-    );
+    await tester.tap(find.byKey(const Key('cleanup-olderThan30Days')));
     await tester.pumpAndSettle();
 
     expect(find.text('刪除 1 張過期優惠？'), findsOneWidget);
     expect(store.allOffers, hasLength(1));
 
-    await tester.tap(
-      find.byKey(const Key('confirm-expired-cleanup-button')),
-    );
+    await tester.tap(find.byKey(const Key('confirm-expired-cleanup-button')));
     await tester.pumpAndSettle();
 
     expect(store.allOffers, isEmpty);
