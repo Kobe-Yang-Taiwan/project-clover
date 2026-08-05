@@ -22,8 +22,8 @@ abstract class CouponImportService {
 
 class LocalCouponImportService implements CouponImportService {
   LocalCouponImportService({TextRecognizer? recognizer})
-    : _recognizer = recognizer ??
-          TextRecognizer(script: TextRecognitionScript.chinese);
+    : _recognizer =
+          recognizer ?? TextRecognizer(script: TextRecognitionScript.chinese);
 
   static const maxFileBytes = 30 * 1024 * 1024;
   static const maxPdfPages = 30;
@@ -61,13 +61,18 @@ class LocalCouponImportService implements CouponImportService {
   Future<OcrPageResult> recognizeImage(String path) async {
     final watch = Stopwatch()..start();
     try {
-      final recognized = await _recognizer.processImage(InputImage.fromFilePath(path));
+      final recognized = await _recognizer.processImage(
+        InputImage.fromFilePath(path),
+      );
       watch.stop();
       return OcrPageResult(
         sourceType: ImportSourceType.image,
         pageNumber: null,
         text: recognized.text,
-        lines: recognized.blocks.expand((block) => block.lines).map((line) => line.text).toList(),
+        lines: recognized.blocks
+            .expand((block) => block.lines)
+            .map((line) => line.text)
+            .toList(),
         succeeded: true,
         duration: watch.elapsed,
       );
@@ -101,7 +106,11 @@ class LocalCouponImportService implements CouponImportService {
       }
       final results = <OcrPageResult>[];
       onProgress(ImportProgress(completed: 0, total: document.pagesCount));
-      for (var pageNumber = 1; pageNumber <= document.pagesCount; pageNumber++) {
+      for (
+        var pageNumber = 1;
+        pageNumber <= document.pagesCount;
+        pageNumber++
+      ) {
         if (isCancelled()) throw const ImportCancelledException();
         final watch = Stopwatch()..start();
         PdfPage? page;
@@ -153,7 +162,9 @@ class LocalCouponImportService implements CouponImportService {
         } finally {
           await page?.close();
         }
-        onProgress(ImportProgress(completed: pageNumber, total: document.pagesCount));
+        onProgress(
+          ImportProgress(completed: pageNumber, total: document.pagesCount),
+        );
       }
       return results;
     } on ImportCancelledException {

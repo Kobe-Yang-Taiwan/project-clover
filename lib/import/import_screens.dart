@@ -192,7 +192,9 @@ class _PdfImportScreenState extends State<PdfImportScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(value: progress.completed / total),
+                    CircularProgressIndicator(
+                      value: progress.completed / total,
+                    ),
                     const SizedBox(height: 20),
                     Text('正在本機處理第 ${progress.completed}／${progress.total} 頁'),
                     const SizedBox(height: 8),
@@ -235,7 +237,9 @@ class _CandidateEditorState extends State<CandidateEditor> {
   final formKey = GlobalKey<FormState>();
   late final title = TextEditingController(text: widget.candidate.title);
   late final merchant = TextEditingController(text: widget.candidate.merchant);
-  late final description = TextEditingController(text: widget.candidate.offerDescription);
+  late final description = TextEditingController(
+    text: widget.candidate.offerDescription,
+  );
   late final value = TextEditingController(text: widget.candidate.valueText);
   late DateTime? expiration = widget.candidate.expirationDate;
   late OfferCategory category = widget.candidate.category;
@@ -262,7 +266,11 @@ class _CandidateEditorState extends State<CandidateEditor> {
           if (widget.imagePath != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.file(File(widget.imagePath!), height: 180, fit: BoxFit.contain),
+              child: Image.file(
+                File(widget.imagePath!),
+                height: 180,
+                fit: BoxFit.contain,
+              ),
             ),
           const Card(
             child: ListTile(
@@ -284,10 +292,14 @@ class _CandidateEditorState extends State<CandidateEditor> {
             key: const Key('import-title-field'),
             controller: title,
             decoration: const InputDecoration(labelText: '優惠名稱 *'),
-            validator: (text) => text == null || text.trim().isEmpty ? '請輸入優惠名稱' : null,
+            validator: (text) =>
+                text == null || text.trim().isEmpty ? '請輸入優惠名稱' : null,
           ),
           const SizedBox(height: 12),
-          TextFormField(controller: merchant, decoration: const InputDecoration(labelText: '來源／品牌')),
+          TextFormField(
+            controller: merchant,
+            decoration: const InputDecoration(labelText: '來源／品牌'),
+          ),
           const SizedBox(height: 12),
           InkWell(
             key: const Key('import-expiry-field'),
@@ -303,16 +315,26 @@ class _CandidateEditorState extends State<CandidateEditor> {
           if (widget.candidate.alternativeDates.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text('其他可能日期：${widget.candidate.alternativeDates.map(_date).join('、')}'),
+              child: Text(
+                '其他可能日期：${widget.candidate.alternativeDates.map(_date).join('、')}',
+              ),
             ),
           const SizedBox(height: 12),
-          TextFormField(controller: value, decoration: const InputDecoration(labelText: '折扣／價值')),
+          TextFormField(
+            controller: value,
+            decoration: const InputDecoration(labelText: '折扣／價值'),
+          ),
           const SizedBox(height: 12),
           DropdownButtonFormField<OfferCategory>(
             initialValue: category,
             decoration: const InputDecoration(labelText: '分類'),
             items: OfferCategory.values
-                .map((item) => DropdownMenuItem(value: item, child: Text(_category(item))))
+                .map(
+                  (item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(_category(item)),
+                  ),
+                )
                 .toList(),
             onChanged: (item) {
               if (item != null) setState(() => category = item);
@@ -333,7 +355,11 @@ class _CandidateEditorState extends State<CandidateEditor> {
           ExpansionTile(
             title: const Text('查看辨識原文'),
             children: [
-              SelectableText(widget.candidate.rawText.isEmpty ? '沒有辨識文字' : widget.candidate.rawText),
+              SelectableText(
+                widget.candidate.rawText.isEmpty
+                    ? '沒有辨識文字'
+                    : widget.candidate.rawText,
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -341,7 +367,10 @@ class _CandidateEditorState extends State<CandidateEditor> {
             key: const Key('confirm-import-coupon'),
             onPressed: saving ? null : _submit,
             icon: saving
-                ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.check),
             label: Text(widget.onUpdated == null ? '確認並建立優惠' : '套用修改'),
           ),
@@ -364,7 +393,8 @@ class _CandidateEditorState extends State<CandidateEditor> {
 
   Future<void> _submit() async {
     setState(() => attempted = true);
-    if (!(formKey.currentState?.validate() ?? false) || expiration == null) return;
+    if (!(formKey.currentState?.validate() ?? false) || expiration == null)
+      return;
     final updated = widget.candidate.copyWith(
       title: title.text.trim(),
       merchant: merchant.text.trim(),
@@ -398,9 +428,9 @@ class _CandidateEditorState extends State<CandidateEditor> {
     } catch (_) {
       if (!mounted) return;
       setState(() => saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('匯入失敗，既有優惠沒有變更。')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('匯入失敗，既有優惠沒有變更。')));
     }
   }
 }
@@ -449,12 +479,19 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
             child: Wrap(
               spacing: 8,
               children: [
-                TextButton(onPressed: () => _selectAll(true), child: const Text('全選')),
-                TextButton(onPressed: () => _selectAll(false), child: const Text('全部取消')),
+                TextButton(
+                  onPressed: () => _selectAll(true),
+                  child: const Text('全選'),
+                ),
+                TextButton(
+                  onPressed: () => _selectAll(false),
+                  child: const Text('全部取消'),
+                ),
                 FilterChip(
                   label: const Text('只看需要確認'),
                   selected: needsReviewOnly,
-                  onSelected: (value) => setState(() => needsReviewOnly = value),
+                  onSelected: (value) =>
+                      setState(() => needsReviewOnly = value),
                 ),
               ],
             ),
@@ -467,15 +504,24 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
                 return CheckboxListTile(
                   key: Key('candidate-${candidate.id}'),
                   value: candidate.selected,
-                  onChanged: (value) => _replace(candidate.copyWith(selected: value ?? false)),
-                  title: Text(candidate.title.isEmpty ? '未辨識名稱' : candidate.title),
-                  subtitle: Text([
-                    if (candidate.merchant.isNotEmpty) candidate.merchant,
-                    if (candidate.expirationDate != null) '到期 ${_date(candidate.expirationDate!)}',
-                    if (candidate.sourcePage != null) '第 ${candidate.sourcePage} 頁',
-                    if (candidate.needsReview) '需要確認',
-                    if (candidate.isBatchDuplicate || candidate.isExistingDuplicate) '疑似重複',
-                  ].join('・')),
+                  onChanged: (value) =>
+                      _replace(candidate.copyWith(selected: value ?? false)),
+                  title: Text(
+                    candidate.title.isEmpty ? '未辨識名稱' : candidate.title,
+                  ),
+                  subtitle: Text(
+                    [
+                      if (candidate.merchant.isNotEmpty) candidate.merchant,
+                      if (candidate.expirationDate != null)
+                        '到期 ${_date(candidate.expirationDate!)}',
+                      if (candidate.sourcePage != null)
+                        '第 ${candidate.sourcePage} 頁',
+                      if (candidate.needsReview) '需要確認',
+                      if (candidate.isBatchDuplicate ||
+                          candidate.isExistingDuplicate)
+                        '疑似重複',
+                    ].join('・'),
+                  ),
                   secondary: IconButton(
                     tooltip: '編輯',
                     icon: const Icon(Icons.edit_outlined),
@@ -505,11 +551,15 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
   }
 
   void _selectAll(bool value) => setState(() {
-    candidates = candidates.map((candidate) => candidate.copyWith(selected: value)).toList();
+    candidates = candidates
+        .map((candidate) => candidate.copyWith(selected: value))
+        .toList();
   });
 
   void _replace(CouponCandidate value) => setState(() {
-    final index = candidates.indexWhere((candidate) => candidate.id == value.id);
+    final index = candidates.indexWhere(
+      (candidate) => candidate.id == value.id,
+    );
     candidates[index] = value;
   });
 
@@ -530,8 +580,15 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
   }
 
   Future<void> _confirmImport() async {
-    final selected = candidates.where((candidate) => candidate.selected).toList();
-    final invalid = selected.where((candidate) => candidate.title.isEmpty || candidate.expirationDate == null).length;
+    final selected = candidates
+        .where((candidate) => candidate.selected)
+        .toList();
+    final invalid = selected
+        .where(
+          (candidate) =>
+              candidate.title.isEmpty || candidate.expirationDate == null,
+        )
+        .length;
     if (invalid > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('有 $invalid 張缺少名稱或到期日，請先編輯或取消勾選。')),
@@ -544,7 +601,10 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
         title: Text('匯入 ${selected.length} 張優惠？'),
         content: const Text('確認後才會寫入手機，並依目前的提醒預設建立通知。'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('返回檢查')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('返回檢查'),
+          ),
           FilledButton(
             key: const Key('confirm-batch-import'),
             onPressed: () => Navigator.pop(context, true),
@@ -572,15 +632,15 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
       await widget.reminders.sync(widget.store.activeOffers);
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已匯入 ${selected.length} 張優惠')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已匯入 ${selected.length} 張優惠')));
     } catch (_) {
       if (!mounted) return;
       setState(() => saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('批次匯入失敗，既有資料沒有變更。')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('批次匯入失敗，既有資料沒有變更。')));
     }
   }
 }
@@ -592,7 +652,11 @@ class _ImportLoading extends StatelessWidget {
   Widget build(BuildContext context) => Center(
     child: Column(
       mainAxisSize: MainAxisSize.min,
-      children: [const CircularProgressIndicator(), const SizedBox(height: 16), Text(label)],
+      children: [
+        const CircularProgressIndicator(),
+        const SizedBox(height: 16),
+        Text(label),
+      ],
     ),
   );
 }
@@ -619,15 +683,31 @@ class _ImportError extends StatelessWidget {
   );
 }
 
-List<CouponCandidate> _markDuplicates(List<CouponCandidate> values, List<Offer> existing) {
-  String fingerprint(String title, String merchant, DateTime? date, String value) =>
+List<CouponCandidate> _markDuplicates(
+  List<CouponCandidate> values,
+  List<Offer> existing,
+) {
+  String fingerprint(
+    String title,
+    String merchant,
+    DateTime? date,
+    String value,
+  ) =>
       '${title.trim().toLowerCase()}|${merchant.trim().toLowerCase()}|${date?.toIso8601String().split('T').first}|${value.trim().toLowerCase()}';
   final seen = <String>{};
   return values.map((candidate) {
-    final key = fingerprint(candidate.title, candidate.merchant, candidate.expirationDate, candidate.valueText);
-    final batchDuplicate = key.replaceAll('|null|', '||').isNotEmpty && !seen.add(key);
+    final key = fingerprint(
+      candidate.title,
+      candidate.merchant,
+      candidate.expirationDate,
+      candidate.valueText,
+    );
+    final batchDuplicate =
+        key.replaceAll('|null|', '||').isNotEmpty && !seen.add(key);
     final existingDuplicate = existing.any(
-      (offer) => fingerprint(offer.name, offer.source, offer.expiresAt, '').startsWith(
+      (
+        offer,
+      ) => fingerprint(offer.name, offer.source, offer.expiresAt, '').startsWith(
         '${candidate.title.trim().toLowerCase()}|${candidate.merchant.trim().toLowerCase()}|${candidate.expirationDate?.toIso8601String().split('T').first}|',
       ),
     );

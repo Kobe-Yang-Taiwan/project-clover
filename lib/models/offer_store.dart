@@ -381,8 +381,7 @@ class OfferStore extends ChangeNotifier {
         expiresAt: value.expiresAt,
         source: value.source.trim(),
         note: value.note.trim(),
-        reminderEnabled:
-            value.reminderEnabled ?? _reminderDefaults.enabled,
+        reminderEnabled: value.reminderEnabled ?? _reminderDefaults.enabled,
         reminderDaysBefore: normalizeReminderDays(
           value.reminderDaysBefore ?? _reminderDefaults.daysBefore,
         ),

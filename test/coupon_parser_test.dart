@@ -16,7 +16,10 @@ void main() {
   );
 
   test('parses Gregorian date formats and a date range', () {
-    expect(parser.parseDates('有效期限 2026/08/31').selected, DateTime(2026, 8, 31));
+    expect(
+      parser.parseDates('有效期限 2026/08/31').selected,
+      DateTime(2026, 8, 31),
+    );
     expect(parser.parseDates('截止 2026-09-15').selected, DateTime(2026, 9, 15));
     expect(parser.parseDates('至 2026.10.20').selected, DateTime(2026, 10, 20));
 

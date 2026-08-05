@@ -111,31 +111,38 @@ class CouponParser {
       );
     }
     selected ??= contextual.isNotEmpty ? contextual.last : unique.last;
-    final alternatives = unique.where((date) => !_sameDate(date, selected!)).toList();
+    final alternatives = unique
+        .where((date) => !_sameDate(date, selected!))
+        .toList();
     return DateInference(
       selected: selected,
       start: start,
       alternatives: alternatives,
-      isAmbiguous: alternatives.isNotEmpty && contextual.length != 1 && range == null,
-      yearMissing: yearMissing && selected == null,
+      isAmbiguous:
+          alternatives.isNotEmpty && contextual.length != 1 && range == null,
+      yearMissing: false,
     );
   }
 
   OfferCategory suggestCategory(String text) {
     final value = text.toLowerCase();
-    if (_contains(value, ['咖啡', '拿鐵', 'coffee', '星巴克'])) return OfferCategory.coffee;
+    if (_contains(value, ['咖啡', '拿鐵', 'coffee', '星巴克']))
+      return OfferCategory.coffee;
     if (_contains(value, ['超商', '7-eleven', '全家', '萊爾富'])) {
       return OfferCategory.convenienceStore;
     }
     if (_contains(value, ['餐', '食品', '飲料', 'food', 'pizza', '麥當勞'])) {
       return OfferCategory.food;
     }
-    if (_contains(value, ['百貨', 'mall', '購物中心'])) return OfferCategory.departmentStore;
+    if (_contains(value, ['百貨', 'mall', '購物中心']))
+      return OfferCategory.departmentStore;
     if (_contains(value, ['網購', '電商', '蝦皮', 'momo', 'pchome'])) {
       return OfferCategory.onlineShopping;
     }
-    if (_contains(value, ['電影', '影城', '遊樂園', '娛樂'])) return OfferCategory.entertainment;
-    if (_contains(value, ['旅館', '飯店', '住宿', '旅行', '機票'])) return OfferCategory.travel;
+    if (_contains(value, ['電影', '影城', '遊樂園', '娛樂']))
+      return OfferCategory.entertainment;
+    if (_contains(value, ['旅館', '飯店', '住宿', '旅行', '機票']))
+      return OfferCategory.travel;
     if (_contains(value, ['捷運', '高鐵', '計程車', '停車', '交通'])) {
       return OfferCategory.transportation;
     }
@@ -184,20 +191,32 @@ class CouponParser {
   }
 
   String _extractValue(List<String> lines) => lines.firstWhere(
-    (line) => RegExp(r'(\d+\s*%|\d+\s*折|[$NT＄]\s*\d+|現折|折抵|買.+送)').hasMatch(line),
+    (line) =>
+        RegExp(r'(\d+\s*%|\d+\s*折|[$NT＄]\s*\d+|現折|折抵|買.+送)').hasMatch(line),
     orElse: () => '',
   );
 
-  String _extractDescription(List<String> lines, String title, String merchant) =>
-      lines.where((line) => line != title && line != merchant).take(4).join('\n');
+  String _extractDescription(
+    List<String> lines,
+    String title,
+    String merchant,
+  ) => lines
+      .where((line) => line != title && line != merchant)
+      .take(4)
+      .join('\n');
 
-  bool _looksLikeDate(String value) => RegExp(r'\d{1,4}\s*[年./-]\s*\d{1,2}').hasMatch(value);
+  bool _looksLikeDate(String value) =>
+      RegExp(r'\d{1,4}\s*[年./-]\s*\d{1,2}').hasMatch(value);
   bool _contains(String text, List<String> terms) => terms.any(text.contains);
-  bool _sameDate(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+  bool _sameDate(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
   DateTime? _validDate(int year, int month, int day) {
-    if (year < 2000 || year > (_now?.call() ?? DateTime.now()).year + 10) return null;
+    if (year < 2000 || year > (_now?.call() ?? DateTime.now()).year + 10)
+      return null;
     if (month < 1 || month > 12 || day < 1 || day > 31) return null;
     final value = DateTime(year, month, day);
-    return value.year == year && value.month == month && value.day == day ? value : null;
+    return value.year == year && value.month == month && value.day == day
+        ? value
+        : null;
   }
 }

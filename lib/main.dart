@@ -114,7 +114,8 @@ class _CloverAppState extends State<CloverApp> {
   @override
   void dispose() {
     if (widget.store == null) store.dispose();
-    if (widget.importService == null && importService is LocalCouponImportService) {
+    if (widget.importService == null &&
+        importService is LocalCouponImportService) {
       (importService as LocalCouponImportService).dispose();
     }
     super.dispose();
@@ -450,15 +451,19 @@ class _CloverHomeState extends State<CloverHome> {
       );
     } on ImportLimitException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } on FormatException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('無法開啟選取的檔案，請確認格式後再試。')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('無法開啟選取的檔案，請確認格式後再試。')));
     }
   }
 }

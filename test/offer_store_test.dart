@@ -673,8 +673,15 @@ void main() {
   });
 
   test('failed batch import leaves existing data unchanged', () async {
-    final original = Offer(id: 'original', name: '原有優惠', expiresAt: DateTime(2026, 9, 1));
-    final store = OfferStore(initialOffers: [original], storage: FailingOfferStorage());
+    final original = Offer(
+      id: 'original',
+      name: '原有優惠',
+      expiresAt: DateTime(2026, 9, 1),
+    );
+    final store = OfferStore(
+      initialOffers: [original],
+      storage: FailingOfferStorage(),
+    );
 
     await expectLater(
       store.addOffers([
