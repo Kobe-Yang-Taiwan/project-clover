@@ -657,6 +657,33 @@ void main() {
     );
     expect(store.allOffers.map((offer) => offer.id), ['old-a', 'old-b']);
   });
+
+  test('batch import persists all coupons in one atomic update', () async {
+    final storage = MemoryOfferStorage();
+    final store = OfferStore(initialOffers: [], storage: storage);
+
+    final created = await store.addOffers([
+      NewOfferData(name: '優惠 A', expiresAt: DateTime(2026, 9, 1)),
+      NewOfferData(name: '優惠 B', expiresAt: DateTime(2026, 9, 2)),
+    ]);
+
+    expect(created, hasLength(2));
+    expect(store.allOffers.map((offer) => offer.name), ['優惠 A', '優惠 B']);
+    expect(storage.savedOffers, hasLength(2));
+  });
+
+  test('failed batch import leaves existing data unchanged', () async {
+    final original = Offer(id: 'original', name: '原有優惠', expiresAt: DateTime(2026, 9, 1));
+    final store = OfferStore(initialOffers: [original], storage: FailingOfferStorage());
+
+    await expectLater(
+      store.addOffers([
+        NewOfferData(name: '新優惠', expiresAt: DateTime(2026, 10, 1)),
+      ]),
+      throwsStateError,
+    );
+    expect(store.allOffers, [original]);
+  });
 }
 
 class MemoryOfferStorage implements OfferStorage {

@@ -3,6 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'beta_support.dart';
+import 'import/coupon_import_models.dart';
+import 'import/import_screens.dart';
+import 'import/local_import_service.dart';
 import 'models/offer.dart';
 import 'models/offer_backup.dart';
 import 'models/offer_storage.dart';
@@ -59,6 +62,7 @@ class CloverApp extends StatefulWidget {
     this.diagnosticInfoProvider,
     this.diagnosticExportService,
     this.feedbackLauncher,
+    this.importService,
   });
 
   final OfferStore? store;
@@ -69,6 +73,7 @@ class CloverApp extends StatefulWidget {
   final DiagnosticInfoProvider? diagnosticInfoProvider;
   final DiagnosticExportService? diagnosticExportService;
   final FeedbackLauncher? feedbackLauncher;
+  final CouponImportService? importService;
 
   @override
   State<CloverApp> createState() => _CloverAppState();
@@ -84,6 +89,8 @@ class _CloverAppState extends State<CloverApp> {
       widget.diagnosticExportService ?? FilePickerDiagnosticExportService();
   late final FeedbackLauncher feedbackLauncher =
       widget.feedbackLauncher ?? EmailFeedbackLauncher();
+  late final CouponImportService importService =
+      widget.importService ?? LocalCouponImportService();
 
   @override
   void initState() {
@@ -107,6 +114,9 @@ class _CloverAppState extends State<CloverApp> {
   @override
   void dispose() {
     if (widget.store == null) store.dispose();
+    if (widget.importService == null && importService is LocalCouponImportService) {
+      (importService as LocalCouponImportService).dispose();
+    }
     super.dispose();
   }
 
@@ -131,6 +141,7 @@ class _CloverAppState extends State<CloverApp> {
         diagnosticInfoProvider: diagnosticInfoProvider,
         diagnosticExportService: diagnosticExportService,
         feedbackLauncher: feedbackLauncher,
+        importService: importService,
       ),
     );
   }
@@ -144,6 +155,7 @@ class CloverHome extends StatefulWidget {
     required this.diagnosticInfoProvider,
     required this.diagnosticExportService,
     required this.feedbackLauncher,
+    required this.importService,
     super.key,
   });
 
@@ -153,6 +165,7 @@ class CloverHome extends StatefulWidget {
   final DiagnosticInfoProvider diagnosticInfoProvider;
   final DiagnosticExportService diagnosticExportService;
   final FeedbackLauncher feedbackLauncher;
+  final CouponImportService importService;
 
   @override
   State<CloverHome> createState() => _CloverHomeState();
@@ -398,12 +411,55 @@ class _CloverHomeState extends State<CloverHome> {
   }
 
   Future<void> _openAddOffer(BuildContext context) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) =>
-            AddOfferScreen(store: widget.store, reminders: widget.reminders),
-      ),
+    final choice = await showModalBottomSheet<ImportChoice>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => const ImportChoiceSheet(),
     );
+    if (!mounted || choice == null) return;
+    if (choice == ImportChoice.manual) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) =>
+              AddOfferScreen(store: widget.store, reminders: widget.reminders),
+        ),
+      );
+      return;
+    }
+    try {
+      final path = choice == ImportChoice.image
+          ? await widget.importService.pickImage()
+          : await widget.importService.pickPdf();
+      if (!mounted || path == null) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => choice == ImportChoice.image
+              ? ImageImportScreen(
+                  path: path,
+                  service: widget.importService,
+                  store: widget.store,
+                  reminders: widget.reminders,
+                )
+              : PdfImportScreen(
+                  path: path,
+                  service: widget.importService,
+                  store: widget.store,
+                  reminders: widget.reminders,
+                ),
+        ),
+      );
+    } on ImportLimitException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } on FormatException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('無法開啟選取的檔案，請確認格式後再試。')),
+      );
+    }
   }
 }
 

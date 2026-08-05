@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:project_clover/beta_support.dart';
+import 'package:project_clover/import/coupon_import_models.dart';
+import 'package:project_clover/import/import_screens.dart';
+import 'package:project_clover/import/local_import_service.dart';
 import 'package:project_clover/main.dart';
 import 'package:project_clover/models/offer.dart';
 import 'package:project_clover/models/offer_backup.dart';
@@ -16,6 +19,12 @@ void main() {
     expect(find.byKey(const Key('app-info-button')), findsOneWidget);
     expect(find.byKey(const Key('backup-button')), findsOneWidget);
     await tester.tap(find.byKey(const Key('add-offer-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('手動輸入'), findsOneWidget);
+    expect(find.text('匯入圖片'), findsOneWidget);
+    expect(find.text('匯入 PDF'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('manual-entry-choice')));
     await tester.pumpAndSettle();
 
     expect(find.text('新增優惠'), findsWidgets);
@@ -54,6 +63,58 @@ void main() {
 
     expect(find.text('優惠詳情'), findsOneWidget);
     expect(find.text('通知點擊測試'), findsOneWidget);
+  });
+
+  testWidgets('canceling image picker leaves data unchanged', (tester) async {
+    final store = OfferStore(initialOffers: []);
+    await tester.pumpWidget(
+      CloverApp(store: store, importService: CancelledImportService()),
+    );
+
+    await tester.tap(find.byKey(const Key('add-offer-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('image-import-choice')));
+    await tester.pumpAndSettle();
+
+    expect(store.allOffers, isEmpty);
+    expect(find.text('今天值得使用'), findsOneWidget);
+  });
+
+  testWidgets('confirmed candidate creates exactly one coupon', (tester) async {
+    final store = OfferStore(initialOffers: []);
+    final reminders = RecordingReminderScheduler();
+    final candidate = CouponCandidate(
+      id: 'candidate',
+      title: '匯入咖啡券',
+      merchant: '測試咖啡',
+      expirationDate: DateTime.now().add(const Duration(days: 30)),
+      rawText: '匯入咖啡券',
+      sourcePage: null,
+      category: OfferCategory.coffee,
+      confidence: ImportConfidence.high,
+      attentionFields: const [],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh', 'TW'),
+        home: Scaffold(
+          body: CandidateEditor(
+            candidate: candidate,
+            store: store,
+            reminders: reminders,
+          ),
+        ),
+      ),
+    );
+
+    final button = find.byKey(const Key('confirm-import-coupon'));
+    await tester.scrollUntilVisible(button, 300);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+
+    expect(store.allOffers, hasLength(1));
+    expect(store.allOffers.single.name, '匯入咖啡券');
+    expect(reminders.syncCount, 1);
   });
 
   testWidgets('active offer can be edited', (tester) async {
@@ -479,4 +540,23 @@ class FakeDiagnosticExportService implements DiagnosticExportService {
     exportedInfo = info;
     return true;
   }
+}
+
+class CancelledImportService implements CouponImportService {
+  @override
+  Future<String?> pickImage() async => null;
+
+  @override
+  Future<String?> pickPdf() async => null;
+
+  @override
+  Future<OcrPageResult> recognizeImage(String path) =>
+      throw UnimplementedError();
+
+  @override
+  Future<List<OcrPageResult>> recognizePdf(
+    String path, {
+    required void Function(ImportProgress progress) onProgress,
+    required bool Function() isCancelled,
+  }) => throw UnimplementedError();
 }

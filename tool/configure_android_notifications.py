@@ -61,6 +61,13 @@ if "desugar_jdk_libs" not in gradle:
     gradle += """
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 }
 """
+elif "text-recognition-chinese" not in gradle:
+    gradle = gradle.replace(
+        'dependencies {\n',
+        'dependencies {\n    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")\n',
+        1,
+    )
 gradle_path.write_text(gradle, encoding="utf-8")

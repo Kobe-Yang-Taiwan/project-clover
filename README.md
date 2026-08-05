@@ -2,7 +2,16 @@
 
 Project Clover 是一款 Android 優先的優惠管理原型，協助使用者快速看見即將到期的優惠，避免已擁有的價值因遺忘而浪費。
 
-## Prototype V0.12 Beta Validation 已包含
+## Prototype V0.13 Universal Import Phase 1 已包含
+
+- 新增入口可選擇手動輸入、匯入圖片或匯入 PDF；原手動表單維持不變
+- 圖片與 PDF 使用裝置端 OCR，不上傳原始檔或辨識文字
+- 支援繁體中文、英文、數字及常見西元／民國日期格式
+- OCR 結果一律先進入確認畫面，不會自動儲存或建立提醒
+- PDF 逐頁顯示進度，可取消，單頁失敗不影響成功頁面
+- PDF 候選清單支援全選、取消全選、只看需確認、逐筆編輯與批次匯入
+- 疑似重複項目只提出警告，不覆蓋或刪除既有優惠
+- 批次寫入失敗時回復匯入前狀態
 
 - Founder 驗收清單依核心功能、通知、備份／還原、Dashboard、My Day、搜尋／篩選／排序分組
 - Beta Feedback：開啟 Email App，預先附上版本、Build、Android 版本與裝置型號
@@ -72,7 +81,9 @@ Project Clover 是一款 Android 優先的優惠管理原型，協助使用者�
 
 ## 本版限制
 
-- 不包含登入、雲端同步、OCR、AI、家庭共享與商業功能
+- 不包含登入、雲端同步、外部 AI、相機、分享目標、Barcode、QR Code、家庭共享與商業功能
+- PDF 上限 30 MB／30 頁；第一階段以每頁至少產生一筆可編輯候選為基準
+- OCR 正確率受圖片解析度、排版、字體及裝置效能影響，所有欄位必須由使用者確認
 - Repository 採 source-only 管理；Android 平台檔在建置時由 Flutter CLI 產生
 
 ## 自動驗證

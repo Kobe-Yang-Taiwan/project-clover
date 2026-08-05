@@ -65,6 +65,32 @@ class MyDayDashboard {
   final List<Offer> mustUseThisWeek;
 }
 
+class NewOfferData {
+  const NewOfferData({
+    required this.name,
+    required this.expiresAt,
+    this.source = '',
+    this.note = '',
+    this.reminderEnabled,
+    this.reminderDaysBefore,
+    this.reminderHour,
+    this.reminderMinute,
+    this.isFavorite = false,
+    this.category = OfferCategory.others,
+  });
+
+  final String name;
+  final DateTime expiresAt;
+  final String source;
+  final String note;
+  final bool? reminderEnabled;
+  final int? reminderDaysBefore;
+  final int? reminderHour;
+  final int? reminderMinute;
+  final bool isFavorite;
+  final OfferCategory category;
+}
+
 class OfferStore extends ChangeNotifier {
   OfferStore({
     List<Offer>? initialOffers,
@@ -340,6 +366,46 @@ class OfferStore extends ChangeNotifier {
     }
     notifyListeners();
     return offer;
+  }
+
+  Future<List<Offer>> addOffers(List<NewOfferData> values) async {
+    if (values.isEmpty) return const [];
+    final previous = List<Offer>.from(_offers);
+    final now = DateTime.now();
+    final created = <Offer>[];
+    for (var index = 0; index < values.length; index++) {
+      final value = values[index];
+      final offer = Offer(
+        id: '${now.microsecondsSinceEpoch}-$index',
+        name: value.name.trim(),
+        expiresAt: value.expiresAt,
+        source: value.source.trim(),
+        note: value.note.trim(),
+        reminderEnabled:
+            value.reminderEnabled ?? _reminderDefaults.enabled,
+        reminderDaysBefore: normalizeReminderDays(
+          value.reminderDaysBefore ?? _reminderDefaults.daysBefore,
+        ),
+        reminderHour: value.reminderHour ?? _reminderDefaults.hour,
+        reminderMinute: value.reminderMinute ?? _reminderDefaults.minute,
+        createdAt: now,
+        updatedAt: now,
+        isFavorite: value.isFavorite,
+        category: value.category,
+      );
+      created.add(offer);
+      _offers.add(offer);
+    }
+    try {
+      await _persist();
+    } catch (_) {
+      _offers
+        ..clear()
+        ..addAll(previous);
+      rethrow;
+    }
+    notifyListeners();
+    return List<Offer>.unmodifiable(created);
   }
 
   Future<void> updateOffer({
