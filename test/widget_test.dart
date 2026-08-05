@@ -108,7 +108,11 @@ void main() {
     );
 
     final button = find.byKey(const Key('confirm-import-coupon'));
-    await tester.scrollUntilVisible(button, 300);
+    await tester.scrollUntilVisible(
+      button,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(button);
     await tester.pumpAndSettle();
 

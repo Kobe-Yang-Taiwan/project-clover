@@ -172,7 +172,9 @@ class CouponParser {
   String _extractTitle(List<String> lines) {
     for (final line in lines) {
       if (line.length < 2 || line.length > 50 || _looksLikeDate(line)) continue;
-      if (RegExp(r'^(有效期限|使用期限|活動期間|兌換期限|注意事項)').hasMatch(line)) continue;
+      if (RegExp(r'^(有效期限|使用期限|活動期間|兌換期限|注意事項|本券)').hasMatch(line)) {
+        continue;
+      }
       return line;
     }
     return '';
