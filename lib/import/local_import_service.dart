@@ -148,8 +148,8 @@ class LocalCouponImportService implements CouponImportService {
                   .toList(),
               positionedLines: _positionedLines(
                 recognized,
-                width: rendered.width.toDouble(),
-                height: rendered.height.toDouble(),
+                width: rendered.width?.toDouble() ?? renderedPageWidth,
+                height: rendered.height?.toDouble() ?? page.height * scale,
               ),
               succeeded: true,
               duration: watch.elapsed,
