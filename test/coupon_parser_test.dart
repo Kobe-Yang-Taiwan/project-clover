@@ -89,7 +89,7 @@ void main() {
     expect(candidate.title, contains('牛乳'));
   });
 
-  test('catalogue fixture requires 100% correct positioned ITEM candidates', () {
+  test('catalogue fixture requires 100% correct candidates', () {
     final positioned = <OcrTextLine>[
       const OcrTextLine(
         text: '優惠期間 2026/04/13 2026/05/10',
