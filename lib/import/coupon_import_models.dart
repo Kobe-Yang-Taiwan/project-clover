@@ -4,6 +4,25 @@ enum ImportSourceType { image, pdf }
 
 enum ImportConfidence { high, medium, low }
 
+class OcrTextLine {
+  const OcrTextLine({
+    required this.text,
+    required this.left,
+    required this.top,
+    required this.right,
+    required this.bottom,
+  });
+
+  final String text;
+  final double left;
+  final double top;
+  final double right;
+  final double bottom;
+
+  double get centerX => (left + right) / 2;
+  double get centerY => (top + bottom) / 2;
+}
+
 class OcrPageResult {
   const OcrPageResult({
     required this.sourceType,
@@ -13,6 +32,7 @@ class OcrPageResult {
     required this.succeeded,
     required this.duration,
     this.failureCode,
+    this.positionedLines = const [],
   });
 
   final ImportSourceType sourceType;
@@ -22,6 +42,7 @@ class OcrPageResult {
   final bool succeeded;
   final Duration duration;
   final String? failureCode;
+  final List<OcrTextLine> positionedLines;
 }
 
 class DateInference {

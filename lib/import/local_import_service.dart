@@ -27,7 +27,10 @@ class LocalCouponImportService implements CouponImportService {
 
   static const maxFileBytes = 30 * 1024 * 1024;
   static const maxPdfPages = 30;
-  static const renderedPageWidth = 1600.0;
+  // A 1600 px page gives each column of a four-column catalogue only about
+  // 400 px. At 3000 px ML Kit can reliably retain item numbers and prices
+  // while the rendered page remains below ten megapixels for common A4 pages.
+  static const renderedPageWidth = 3000.0;
 
   final TextRecognizer _recognizer;
 
@@ -73,6 +76,7 @@ class LocalCouponImportService implements CouponImportService {
             .expand((block) => block.lines)
             .map((line) => line.text)
             .toList(),
+        positionedLines: _positionedLines(recognized),
         succeeded: true,
         duration: watch.elapsed,
       );
@@ -142,6 +146,11 @@ class LocalCouponImportService implements CouponImportService {
                   .expand((block) => block.lines)
                   .map((line) => line.text)
                   .toList(),
+              positionedLines: _positionedLines(
+                recognized,
+                width: rendered.width.toDouble(),
+                height: rendered.height.toDouble(),
+              ),
               succeeded: true,
               duration: watch.elapsed,
             ),
@@ -191,6 +200,45 @@ class LocalCouponImportService implements CouponImportService {
     if (await file.length() > maxFileBytes) {
       throw const ImportLimitException('檔案上限為 30 MB，請縮小或拆分後再試。');
     }
+  }
+
+  List<OcrTextLine> _positionedLines(
+    RecognizedText recognized, {
+    double? width,
+    double? height,
+  }) {
+    final lines = recognized.blocks.expand((block) => block.lines).toList();
+    if (lines.isEmpty) return const [];
+    final effectiveWidth =
+        width ??
+        lines
+            .map((line) => line.boundingBox.right)
+            .reduce((a, b) => a > b ? a : b);
+    final effectiveHeight =
+        height ??
+        lines
+            .map((line) => line.boundingBox.bottom)
+            .reduce((a, b) => a > b ? a : b);
+    if (effectiveWidth <= 0 || effectiveHeight <= 0) return const [];
+    return lines
+        .map(
+          (line) => OcrTextLine(
+            text: line.text,
+            left: (line.boundingBox.left / effectiveWidth)
+                .clamp(0, 1)
+                .toDouble(),
+            top: (line.boundingBox.top / effectiveHeight)
+                .clamp(0, 1)
+                .toDouble(),
+            right: (line.boundingBox.right / effectiveWidth)
+                .clamp(0, 1)
+                .toDouble(),
+            bottom: (line.boundingBox.bottom / effectiveHeight)
+                .clamp(0, 1)
+                .toDouble(),
+          ),
+        )
+        .toList();
   }
 
   void dispose() => _recognizer.close();

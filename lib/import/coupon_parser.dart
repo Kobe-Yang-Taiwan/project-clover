@@ -110,6 +110,13 @@ class CouponParser {
         int.parse(range.group(6)!),
       );
     }
+    if (range == null &&
+        RegExp(r'優惠期間|活動期間').hasMatch(text) &&
+        unique.length >= 2) {
+      final ordered = List<DateTime>.from(unique)..sort();
+      start = ordered.first;
+      selected = ordered.last;
+    }
     selected ??= contextual.isNotEmpty ? contextual.last : unique.last;
     final alternatives = unique
         .where((date) => !_sameDate(date, selected!))
@@ -150,6 +157,8 @@ class CouponParser {
   }
 
   List<OcrPageResult> _splitCandidates(OcrPageResult page) {
+    final spatial = _splitCatalogueByItemAnchors(page);
+    if (spatial.length > 1) return spatial;
     final chunks = page.text
         .split(RegExp(r'\n\s*(?:-{3,}|={3,}|\*{3,})\s*\n'))
         .where((chunk) => chunk.trim().isNotEmpty)
@@ -169,13 +178,104 @@ class CouponParser {
         .toList();
   }
 
-  String _extractTitle(List<String> lines) {
-    for (final line in lines) {
-      if (line.length < 2 || line.length > 50 || _looksLikeDate(line)) continue;
-      if (RegExp(r'^(有效期限|使用期限|活動期間|兌換期限|注意事項|本券)').hasMatch(line)) {
-        continue;
+  List<OcrPageResult> _splitCatalogueByItemAnchors(OcrPageResult page) {
+    final positioned = page.positionedLines;
+    final anchors =
+        positioned.where((line) => _itemPattern.hasMatch(line.text)).toList()
+          ..sort((a, b) => a.centerY.compareTo(b.centerY));
+    if (anchors.length < 2) return const [];
+
+    final rows = <List<OcrTextLine>>[];
+    for (final anchor in anchors) {
+      if (rows.isEmpty ||
+          (anchor.centerY - _averageY(rows.last)).abs() > 0.075) {
+        rows.add([anchor]);
+      } else {
+        rows.last.add(anchor);
       }
-      return line;
+    }
+    for (final row in rows) {
+      row.sort((a, b) => a.centerX.compareTo(b.centerX));
+    }
+
+    final commonDateLines = positioned
+        .where((line) => RegExp(r'優惠期間|活動期間|有效期限|使用期限').hasMatch(line.text))
+        .map((line) => line.text.trim())
+        .where((line) => line.isNotEmpty)
+        .toSet()
+        .toList();
+    final results = <OcrPageResult>[];
+    for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      final row = rows[rowIndex];
+      final rowY = _averageY(row);
+      final previousY = rowIndex == 0 ? 0.0 : _averageY(rows[rowIndex - 1]);
+      final nextY = rowIndex == rows.length - 1
+          ? 1.0
+          : _averageY(rows[rowIndex + 1]);
+      final top = rowIndex == 0 ? 0.0 : (previousY + rowY) / 2;
+      final bottom = rowIndex == rows.length - 1 ? 1.0 : (rowY + nextY) / 2;
+
+      for (var column = 0; column < row.length; column++) {
+        final anchor = row[column];
+        final left = column == 0
+            ? 0.0
+            : (row[column - 1].centerX + anchor.centerX) / 2;
+        final right = column == row.length - 1
+            ? 1.0
+            : (anchor.centerX + row[column + 1].centerX) / 2;
+        final cellLines =
+            positioned
+                .where(
+                  (line) =>
+                      line.centerX >= left &&
+                      line.centerX < right &&
+                      line.centerY >= top &&
+                      line.centerY < bottom,
+                )
+                .toList()
+              ..sort((a, b) {
+                final vertical = a.top.compareTo(b.top);
+                return vertical == 0 ? a.left.compareTo(b.left) : vertical;
+              });
+        final textLines = cellLines
+            .map((line) => line.text.trim())
+            .where((line) => line.isNotEmpty)
+            .toList();
+        if (!textLines.any((line) => _itemPattern.hasMatch(line))) continue;
+        final combined = [...textLines, ...commonDateLines].join('\n');
+        results.add(
+          OcrPageResult(
+            sourceType: page.sourceType,
+            pageNumber: page.pageNumber,
+            text: combined,
+            lines: [...textLines, ...commonDateLines],
+            succeeded: true,
+            duration: page.duration,
+            positionedLines: cellLines,
+          ),
+        );
+      }
+    }
+    return results;
+  }
+
+  double _averageY(List<OcrTextLine> lines) =>
+      lines.map((line) => line.centerY).reduce((a, b) => a + b) / lines.length;
+
+  String _extractTitle(List<String> lines) {
+    final itemIndex = lines.indexWhere(_itemPattern.hasMatch);
+    if (itemIndex > 0) {
+      final productLines = lines
+          .take(itemIndex)
+          .where(_isPlausibleTitle)
+          .take(2)
+          .toList();
+      if (productLines.isNotEmpty) return productLines.join(' ');
+    }
+    final ranked = lines.where(_isPlausibleTitle).toList()
+      ..sort((a, b) => _titleScore(b).compareTo(_titleScore(a)));
+    if (ranked.isNotEmpty) {
+      return ranked.first;
     }
     return '';
   }
@@ -186,17 +286,33 @@ class CouponParser {
       final match = labeled.firstMatch(line);
       if (match != null) return match.group(1)!.trim();
     }
+    final itemIndex = lines.indexWhere(_itemPattern.hasMatch);
+    if (itemIndex > 0) {
+      return lines
+          .take(itemIndex)
+          .firstWhere(_isPlausibleTitle, orElse: () => '');
+    }
     return lines.firstWhere(
-      (line) => line != title && line.length <= 24 && !_looksLikeDate(line),
+      (line) => line != title && _isPlausibleTitle(line),
       orElse: () => '',
     );
   }
 
-  String _extractValue(List<String> lines) => lines.firstWhere(
-    (line) =>
-        RegExp(r'(\d+\s*%|\d+\s*折|[$NT＄]\s*\d+|現折|折抵|買.+送)').hasMatch(line),
-    orElse: () => '',
-  );
+  String _extractValue(List<String> lines) {
+    final discount = lines.firstWhere(
+      (line) => RegExp(r'(?:^|\s)-\s*\d[\d,]*').hasMatch(line),
+      orElse: () => '',
+    );
+    if (discount.isNotEmpty) return discount;
+    return lines.firstWhere(
+      (line) =>
+          !_looksLikeStatusBar(line) &&
+          RegExp(
+            r'(\d+\s*%|\d+\s*折|[$NT＄]\s*\d[\d,]*|特價\s*\d+|\d+\s*元|現折|折抵|買.+送)',
+          ).hasMatch(line),
+      orElse: () => '',
+    );
+  }
 
   String _extractDescription(
     List<String> lines,
@@ -209,6 +325,39 @@ class CouponParser {
 
   bool _looksLikeDate(String value) =>
       RegExp(r'\d{1,4}\s*[年./-]\s*\d{1,2}').hasMatch(value);
+  bool _looksLikeStatusBar(String value) =>
+      RegExp(r'^\s*\d{1,2}[:：]\d{2}').hasMatch(value) ||
+      RegExp(r'\b(?:4G|5G|LTE|VoLTE)\b', caseSensitive: false).hasMatch(value);
+  bool _isPlausibleTitle(String line) {
+    final value = line.trim();
+    if (value.length < 2 || value.length > 60) return false;
+    if (_looksLikeDate(value) || _itemPattern.hasMatch(value)) return false;
+    if (_looksLikeStatusBar(value) ||
+        RegExp(r'^(?:\d+[.,]?\d*|[-+＄$]\s*\d)').hasMatch(value)) {
+      return false;
+    }
+    if (RegExp(
+      r'^(優惠期間|活動期間|有效期限|使用期限|兌換期限|注意事項|本券|售完為止|活動數量有限|線上購物|售價以|賣場售價|共\s*\d+\s*週)',
+    ).hasMatch(value)) {
+      return false;
+    }
+    return RegExp(r'[A-Za-z\u4e00-\u9fff]').hasMatch(value);
+  }
+
+  int _titleScore(String line) {
+    var score = 0;
+    if (RegExp(r'[\u4e00-\u9fff]').hasMatch(line)) score += 4;
+    if (RegExp(r'優惠|券|折|送|商品|組|入').hasMatch(line)) score += 3;
+    if (RegExp(r'商店|門市|公司|股份|品牌').hasMatch(line)) score -= 3;
+    if (line.length >= 4 && line.length <= 32) score += 2;
+    if (RegExp(r'^[A-Z0-9 .&-]+$').hasMatch(line)) score -= 2;
+    return score;
+  }
+
+  static final RegExp _itemPattern = RegExp(
+    r'\bI[T7][E3]M\s*[:#-]?\s*\d{4,}\b',
+    caseSensitive: false,
+  );
   bool _contains(String text, List<String> terms) => terms.any(text.contains);
   bool _sameDate(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;

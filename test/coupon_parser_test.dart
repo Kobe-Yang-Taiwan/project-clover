@@ -77,4 +77,80 @@ void main() {
     ]);
     expect(values, hasLength(1));
   });
+
+  test('does not use a phone status-bar time as the coupon title', () {
+    final candidate = parser.parse(
+      page(
+        '20:43 4G 71%\nFamilyMart 全家便利商店\n牛乳成分50%以上 濃厚\n特價39元\n有效期限 2026/08/31',
+      ),
+    );
+
+    expect(candidate.title, isNot(startsWith('20:43')));
+    expect(candidate.title, contains('牛乳'));
+  });
+
+  test('catalogue fixture requires 100% correct positioned ITEM candidates', () {
+    final positioned = <OcrTextLine>[
+      const OcrTextLine(
+        text: '優惠期間 2026/04/13 2026/05/10',
+        left: 0.25,
+        top: 0.01,
+        right: 0.75,
+        bottom: 0.04,
+      ),
+    ];
+    const expected = 10;
+    for (var index = 0; index < expected; index++) {
+      final row = index ~/ 5;
+      final column = index % 5;
+      final x = 0.05 + column * 0.2;
+      final titleY = row == 0 ? 0.10 : 0.51;
+      final itemY = row == 0 ? 0.25 : 0.66;
+      positioned.addAll([
+        OcrTextLine(
+          text: '品牌$index 商品$index',
+          left: x,
+          top: titleY,
+          right: x + 0.12,
+          bottom: titleY + 0.03,
+        ),
+        OcrTextLine(
+          text: 'ITEM ${10000 + index}',
+          left: x,
+          top: itemY,
+          right: x + 0.10,
+          bottom: itemY + 0.03,
+        ),
+        OcrTextLine(
+          text: '-${100 + index}',
+          left: x,
+          top: itemY + 0.07,
+          right: x + 0.06,
+          bottom: itemY + 0.10,
+        ),
+      ]);
+    }
+    final source = OcrPageResult(
+      sourceType: ImportSourceType.pdf,
+      pageNumber: 2,
+      text: positioned.map((line) => line.text).join('\n'),
+      lines: positioned.map((line) => line.text).toList(),
+      positionedLines: positioned,
+      succeeded: true,
+      duration: const Duration(seconds: 1),
+    );
+
+    final candidates = parser.parsePages([source]);
+    final correct = candidates
+        .where(
+          (candidate) =>
+              candidate.title.contains('商品') &&
+              candidate.expirationDate == DateTime(2026, 5, 10) &&
+              candidate.valueText.startsWith('-'),
+        )
+        .length;
+
+    expect(candidates, hasLength(expected));
+    expect(correct, expected);
+  });
 }
