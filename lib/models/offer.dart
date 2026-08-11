@@ -1,6 +1,23 @@
 enum OfferStatus { active, completed }
 
 enum OfferCategory {
+  // V0.15 controlled categories. Legacy identifiers remain below so V0.8+
+  // backups and locally persisted records can still be restored unchanged.
+  foodAndDrink,
+  freshAndChilled,
+  dailyNecessities,
+  cleaningAndLaundry,
+  beautyAndCare,
+  health,
+  appliances,
+  electronics,
+  homeLiving,
+  fashion,
+  baby,
+  pets,
+  automotiveAndOutdoor,
+  diningVoucher,
+  travelAndEntertainment,
   food,
   coffee,
   convenienceStore,
@@ -11,6 +28,25 @@ enum OfferCategory {
   transportation,
   others,
 }
+
+const controlledOfferCategories = <OfferCategory>[
+  OfferCategory.foodAndDrink,
+  OfferCategory.freshAndChilled,
+  OfferCategory.dailyNecessities,
+  OfferCategory.cleaningAndLaundry,
+  OfferCategory.beautyAndCare,
+  OfferCategory.health,
+  OfferCategory.appliances,
+  OfferCategory.electronics,
+  OfferCategory.homeLiving,
+  OfferCategory.fashion,
+  OfferCategory.baby,
+  OfferCategory.pets,
+  OfferCategory.automotiveAndOutdoor,
+  OfferCategory.diningVoucher,
+  OfferCategory.travelAndEntertainment,
+  OfferCategory.others,
+];
 
 enum OfferVisualStatus {
   available,

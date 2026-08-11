@@ -121,6 +121,99 @@ void main() {
     expect(reminders.syncCount, 1);
   });
 
+  testWidgets('Needs Review candidates are first red and not preselected', (
+    tester,
+  ) async {
+    final store = OfferStore(initialOffers: []);
+    final reminders = RecordingReminderScheduler();
+    final expiry = DateTime.now().add(const Duration(days: 30));
+    final ready = CouponCandidate(
+      id: 'ready',
+      title: '資料完整商品',
+      merchant: '測試商店',
+      expirationDate: expiry,
+      rawText: '資料完整商品',
+      sourcePage: 1,
+      category: OfferCategory.foodAndDrink,
+      confidence: ImportConfidence.high,
+      state: CandidateState.ready,
+      attentionFields: const [],
+    );
+    final review = CouponCandidate(
+      id: 'review',
+      title: '名稱可能不完整',
+      merchant: '測試商店',
+      expirationDate: expiry,
+      rawText: '名稱可能不完整',
+      sourcePage: 1,
+      category: OfferCategory.others,
+      confidence: ImportConfidence.medium,
+      state: CandidateState.needsReview,
+      attentionFields: const ['商品名稱不完整'],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BatchReviewScreen(
+          candidates: [ready, review],
+          failedPages: 0,
+          store: store,
+          reminders: reminders,
+        ),
+      ),
+    );
+
+    expect(find.text('已選擇 1 筆，其中 0 筆需要確認'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('名稱可能不完整')).dy,
+      lessThan(tester.getTopLeft(find.text('資料完整商品')).dy),
+    );
+    final reviewText = tester.widget<Text>(find.text('商品名稱不完整'));
+    expect(reviewText.style?.color, isNotNull);
+    expect(store.allOffers, isEmpty);
+    expect(reminders.syncCount, 0);
+  });
+
+  testWidgets(
+    'selected unresolved candidate opens focused review before save',
+    (tester) async {
+      final store = OfferStore(initialOffers: []);
+      final reminders = RecordingReminderScheduler();
+      final candidate = CouponCandidate(
+        id: 'review-flow',
+        title: '待確認商品',
+        merchant: '',
+        expirationDate: null,
+        rawText: '待確認商品',
+        sourcePage: 1,
+        category: OfferCategory.others,
+        confidence: ImportConfidence.low,
+        state: CandidateState.needsReview,
+        attentionFields: const ['缺少商家／來源', '缺少到期日'],
+        selected: true,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BatchReviewScreen(
+            candidates: [candidate],
+            failedPages: 0,
+            store: store,
+            reminders: reminders,
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('batch-import-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('編輯候選優惠'), findsOneWidget);
+      expect(find.byKey(const Key('import-merchant-field')), findsOneWidget);
+      expect(find.byKey(const Key('import-expiry-field')), findsOneWidget);
+      expect(store.allOffers, isEmpty);
+      expect(reminders.syncCount, 0);
+    },
+  );
+
   testWidgets('active offer can be edited', (tester) async {
     final store = OfferStore(
       initialOffers: [

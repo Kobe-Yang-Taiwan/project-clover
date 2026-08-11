@@ -77,6 +77,7 @@ class NewOfferData {
     this.reminderMinute,
     this.isFavorite = false,
     this.category = OfferCategory.others,
+    this.requiresValidatedImport = false,
   });
 
   final String name;
@@ -89,6 +90,7 @@ class NewOfferData {
   final int? reminderMinute;
   final bool isFavorite;
   final OfferCategory category;
+  final bool requiresValidatedImport;
 }
 
 class OfferStore extends ChangeNotifier {
@@ -370,6 +372,13 @@ class OfferStore extends ChangeNotifier {
 
   Future<List<Offer>> addOffers(List<NewOfferData> values) async {
     if (values.isEmpty) return const [];
+    if (values.any(
+      (value) =>
+          value.requiresValidatedImport &&
+          (value.name.trim().isEmpty || value.source.trim().isEmpty),
+    )) {
+      throw const FormatException('匯入資料仍有未確認的關鍵欄位');
+    }
     final previous = List<Offer>.from(_offers);
     final now = DateTime.now();
     final created = <Offer>[];

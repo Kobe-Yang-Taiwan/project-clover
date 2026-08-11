@@ -44,13 +44,14 @@ void main() {
   });
 
   test('extracts candidate fields and preserves raw OCR', () {
-    const raw = '星巴克好友分享券\n品牌：星巴克\n買一送一\n有效期限 2026/08/31';
+    const raw = '來源：星巴克\n星巴克好友分享券\n品牌：星巴克\n買一送一\n有效期限 2026/08/31';
     final candidate = parser.parse(page(raw));
 
     expect(candidate.title, '星巴克好友分享券');
     expect(candidate.merchant, '星巴克');
-    expect(candidate.valueText, '買一送一');
-    expect(candidate.category, OfferCategory.coffee);
+    expect(candidate.brand, '星巴克');
+    expect(candidate.promotionConditions, contains('買一送一'));
+    expect(candidate.category, OfferCategory.diningVoucher);
     expect(candidate.expirationDate, DateTime(2026, 8, 31));
     expect(candidate.rawText, raw);
     expect(candidate.confidence, ImportConfidence.high);

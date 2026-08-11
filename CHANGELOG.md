@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.0+15 — Smart Universal Import
+
+- 圖片與 PDF 皆以空間商品區域產生多候選；一個真實商品以一筆候選為目標。
+- 新增商家／品牌分離、型號、規格、ITEM、原價、優惠價、節省與優惠條件語意。
+- 新增 `READY / NEEDS REVIEW / REJECTED`、非商品拒絕與保守碎片合併。
+- 問題候選置頂、紅字、不預選；所選問題項目可連續逐筆修正。
+- 新增 Final Validation Gate，未解決關鍵欄位不得寫入或建立提醒。
+- 新增 16 項受控分類，保留舊分類識別碼以維持備份相容。
+
 ## 0.13.0+13 — Universal Import Phase 1
 
 - 新增手動輸入、圖片與多頁 PDF 的統一匯入入口。

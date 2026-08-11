@@ -1518,7 +1518,7 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
               key: const Key('offer-category-field'),
               initialValue: category,
               decoration: const InputDecoration(labelText: '分類'),
-              items: OfferCategory.values
+              items: <OfferCategory>{category, ...controlledOfferCategories}
                   .map(
                     (value) => DropdownMenuItem(
                       value: value,
@@ -2030,6 +2030,21 @@ String formatTaiwanTime(TimeOfDay value) {
 }
 
 String offerCategoryLabel(OfferCategory value) => switch (value) {
+  OfferCategory.foodAndDrink => '食品飲料',
+  OfferCategory.freshAndChilled => '生鮮冷藏',
+  OfferCategory.dailyNecessities => '日用品',
+  OfferCategory.cleaningAndLaundry => '清潔洗衣',
+  OfferCategory.beautyAndCare => '美妝保養',
+  OfferCategory.health => '健康保健',
+  OfferCategory.appliances => '家電',
+  OfferCategory.electronics => '3C 通訊',
+  OfferCategory.homeLiving => '家居生活',
+  OfferCategory.fashion => '服飾鞋包',
+  OfferCategory.baby => '母嬰用品',
+  OfferCategory.pets => '寵物用品',
+  OfferCategory.automotiveAndOutdoor => '汽車戶外',
+  OfferCategory.diningVoucher => '餐飲票券',
+  OfferCategory.travelAndEntertainment => '旅遊娛樂',
   OfferCategory.food => '餐飲',
   OfferCategory.coffee => '咖啡',
   OfferCategory.convenienceStore => '便利商店',

@@ -1,40 +1,27 @@
-# Universal Import 架構與隱私資料流
+# Universal Import Architecture — V0.15
 
-## 圖片會發生什麼事
+## Pipeline
 
-1. 使用 Android 系統檔案選擇器挑選圖片，不要求整個相簿權限。
-2. App 將圖片交給手機內的文字辨識元件。
-3. 規則式解析器從辨識文字找出名稱、品牌、日期、折扣與分類建議。
-4. 使用者在確認畫面修改結果。
-5. 只有按下「確認並建立優惠」後，才儲存既有優惠欄位並安排提醒。
+Input → Pre-processing → Local OCR + spatial metadata → Layout segmentation → Product-region detection → Text grouping → Semantic extraction → Non-product rejection → Duplicate/fragment merging → Candidate validation → Fast review → Final import → Reminder / My Day / Dashboard
 
-## PDF 會發生什麼事
+## Spatial data
 
-1. 使用 Android 系統檔案選擇器挑選 PDF。
-2. App 逐頁在手機內轉成暫存圖片，再做文字辨識。
-3. 成功頁面產生可編輯候選；單頁失敗不會丟棄其他頁面。
-4. 使用者勾選、編輯並確認要匯入的項目。
-5. 選取項目以一次資料寫入完成；失敗時回復匯入前狀態。
+`OcrPageResult` 保存 OCR 行文字及正規化 bounding box。解析器優先以 ITEM 錨點切割型錄；沒有 ITEM 時，使用商品價格錨點推導列、欄與區域。狀態列、導覽與共用活動日期在分組前分別過濾或安全下傳，不會過早壓成純文字。
 
-## 暫時內容與永久內容
+## Semantic model
 
-| 內容 | 保存方式 |
-|---|---|
-| 原始圖片／PDF | 只在當次流程讀取，不複製到優惠資料 |
-| PDF 頁面暫存圖 | 處理結束、取消或失敗後刪除 |
-| OCR 原文 | 只供當次預覽，不寫入優惠、備份或診斷檔 |
-| 使用者確認的名稱、日期、品牌、備註、分類 | 依既有 Local-first 格式永久保存在手機 |
+候選暫存商家、品牌、標題、型號、規格、ITEM、起訖日、原價、優惠價、節省、優惠條件、分類、來源頁、信心與待確認原因。這些欄位只存在預覽階段；最終仍轉為既有 `Offer` 格式，因此舊資料庫與備份不需破壞性 migration。
 
-## 為什麼一定要人工確認
+## Candidate validation
 
-OCR 可能把 `8` 看成 `3`，也可能把價目表、印刷日期誤認成到期日。錯誤日期會直接造成錯誤提醒，所以 V0.13 不允許未確認的候選自動寫入。
+- `READY`：必要欄位完整且無重大歧義，可預選。
+- `NEEDS REVIEW`：有效商品可能性高，但欄位缺漏、日期／價格衝突、分組信心低或疑似重複；不預選。
+- `REJECTED`：缺乏商品證據或只含價格、免責、標題、頁碼、導覽等內容；不顯示。
 
-## 模組邊界
+## Final Validation Gate
 
-- `CouponImportService`：選檔、圖片 OCR、PDF 逐頁渲染與 OCR。
-- `OcrPageResult`：保存當次流程的結構化辨識結果與非敏感狀態。
-- `CouponParser`：可測試、固定規則的欄位與日期推論。
-- Review UI：人工校正、選擇與最後確認。
-- `OfferStore.addOffers`：批次寫入與失敗回滾。
+問題候選可由使用者主動選取。匯入時依序開啟所選問題項目，只修正未解欄位。所有選取候選均需具備名稱、商家與確認後的到期日，且不得保留關鍵 attention reason。通過後才呼叫單次批次寫入；成功後才申請／同步提醒。
 
-此分層保留未來加入相機、Android Share、Barcode、QR Code 或選配 AI 解析器的介面，但 V0.13 不包含那些功能。
+## Local-first and cleanup
+
+圖片、PDF、OCR 原文與產品資料不離開裝置。PDF 頁面暫存圖在完成、取消或失敗後清除。診斷報告只能包含區域數、狀態數、缺漏數與時間，不得包含標題、備註、OCR 原文或來源內容。

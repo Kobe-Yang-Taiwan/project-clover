@@ -691,6 +691,31 @@ void main() {
     );
     expect(store.allOffers, [original]);
   });
+
+  test(
+    'final validation gate rejects incomplete import before mutation',
+    () async {
+      final original = Offer(
+        id: 'original-gate',
+        name: '原有優惠',
+        expiresAt: DateTime(2026, 9, 1),
+      );
+      final store = OfferStore(initialOffers: [original]);
+
+      await expectLater(
+        store.addOffers([
+          NewOfferData(
+            name: '待確認優惠',
+            expiresAt: DateTime(2026, 10, 1),
+            requiresValidatedImport: true,
+          ),
+        ]),
+        throwsFormatException,
+      );
+
+      expect(store.allOffers, [same(original)]);
+    },
+  );
 }
 
 class MemoryOfferStorage implements OfferStorage {

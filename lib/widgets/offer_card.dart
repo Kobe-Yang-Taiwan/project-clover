@@ -142,6 +142,21 @@ class OfferCard extends StatelessWidget {
   }
 
   IconData _categoryIcon(OfferCategory category) => switch (category) {
+    OfferCategory.foodAndDrink => Icons.local_grocery_store_outlined,
+    OfferCategory.freshAndChilled => Icons.ac_unit_outlined,
+    OfferCategory.dailyNecessities => Icons.shopping_basket_outlined,
+    OfferCategory.cleaningAndLaundry => Icons.local_laundry_service_outlined,
+    OfferCategory.beautyAndCare => Icons.spa_outlined,
+    OfferCategory.health => Icons.health_and_safety_outlined,
+    OfferCategory.appliances => Icons.kitchen_outlined,
+    OfferCategory.electronics => Icons.devices_outlined,
+    OfferCategory.homeLiving => Icons.chair_outlined,
+    OfferCategory.fashion => Icons.checkroom_outlined,
+    OfferCategory.baby => Icons.child_care_outlined,
+    OfferCategory.pets => Icons.pets_outlined,
+    OfferCategory.automotiveAndOutdoor => Icons.directions_car_outlined,
+    OfferCategory.diningVoucher => Icons.restaurant_outlined,
+    OfferCategory.travelAndEntertainment => Icons.luggage_outlined,
     OfferCategory.food => Icons.restaurant_outlined,
     OfferCategory.coffee => Icons.local_cafe_outlined,
     OfferCategory.convenienceStore => Icons.storefront_outlined,

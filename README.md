@@ -2,7 +2,15 @@
 
 Project Clover 是一款 Android 優先的優惠管理原型，協助使用者快速看見即將到期的優惠，避免已擁有的價值因遺忘而浪費。
 
-## Prototype V0.13 Universal Import Phase 1 已包含
+## V0.15 Smart Universal Import 已包含
+
+- 一張圖片可依文字座標辨識多個商品候選
+- PDF 以 ITEM 或價格錨點建立商品區域，不追求虛高候選數
+- 商家、品牌、標題、型號、規格、ITEM、價格與條件分開解析
+- `READY / NEEDS REVIEW / REJECTED` 三態與 Final Validation Gate
+- 問題候選置頂、紅字、不預選；可選取後逐筆快速修正
+- 16 項受控分類，舊分類與 V0.8 起備份仍可還原
+- 原價沒有可靠證據時顯示未提供，不推算或編造節省金額
 
 - 新增入口可選擇手動輸入、匯入圖片或匯入 PDF；原手動表單維持不變
 - 圖片與 PDF 使用裝置端 OCR，不上傳原始檔或辨識文字

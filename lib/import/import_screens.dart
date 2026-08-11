@@ -71,7 +71,6 @@ class ImageImportScreen extends StatefulWidget {
 }
 
 class _ImageImportScreenState extends State<ImageImportScreen> {
-  CouponCandidate? candidate;
   String? error;
 
   @override
@@ -87,24 +86,36 @@ class _ImageImportScreenState extends State<ImageImportScreen> {
       setState(() => error = '無法辨識這張圖片，請換一張較清楚的圖片。');
       return;
     }
-    setState(() => candidate = widget.parser.parse(result));
+    final parsed = widget.parser.parsePagesDetailed([result]);
+    if (parsed.candidates.isEmpty) {
+      setState(() => error = '圖片中沒有可供檢查的商品優惠。');
+      return;
+    }
+    final candidates = _markDuplicates(
+      parsed.candidates,
+      widget.store.allOffers,
+    );
+    await Navigator.of(context).pushReplacement<void, void>(
+      MaterialPageRoute(
+        builder: (_) => BatchReviewScreen(
+          candidates: candidates,
+          failedPages: 0,
+          qualityReport: parsed.report,
+          imagePath: widget.path,
+          store: widget.store,
+          reminders: widget.reminders,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final value = candidate;
     return Scaffold(
       appBar: AppBar(title: const Text('檢查匯入內容')),
       body: error != null
           ? _ImportError(message: error!, onRetry: () => Navigator.pop(context))
-          : value == null
-          ? const _ImportLoading(label: '正在本機辨識圖片…')
-          : CandidateEditor(
-              candidate: value,
-              imagePath: widget.path,
-              store: widget.store,
-              reminders: widget.reminders,
-            ),
+          : const _ImportLoading(label: '正在本機辨識圖片…'),
     );
   }
 }
@@ -150,8 +161,9 @@ class _PdfImportScreenState extends State<PdfImportScreen> {
         isCancelled: () => cancelled,
       );
       if (!mounted || cancelled) return;
+      final parsed = widget.parser.parsePagesDetailed(pages);
       final candidates = _markDuplicates(
-        widget.parser.parsePages(pages),
+        parsed.candidates,
         widget.store.allOffers,
       );
       if (candidates.isEmpty) {
@@ -163,6 +175,7 @@ class _PdfImportScreenState extends State<PdfImportScreen> {
           builder: (_) => BatchReviewScreen(
             candidates: candidates,
             failedPages: pages.where((page) => !page.succeeded).length,
+            qualityReport: parsed.report,
             store: widget.store,
             reminders: widget.reminders,
           ),
@@ -237,10 +250,19 @@ class _CandidateEditorState extends State<CandidateEditor> {
   final formKey = GlobalKey<FormState>();
   late final title = TextEditingController(text: widget.candidate.title);
   late final merchant = TextEditingController(text: widget.candidate.merchant);
+  late final brand = TextEditingController(text: widget.candidate.brand);
   late final description = TextEditingController(
     text: widget.candidate.offerDescription,
   );
-  late final value = TextEditingController(text: widget.candidate.valueText);
+  late final originalPrice = TextEditingController(
+    text: widget.candidate.originalPrice?.toString() ?? '',
+  );
+  late final promotionalPrice = TextEditingController(
+    text: widget.candidate.promotionalPrice?.toString() ?? '',
+  );
+  late final conditions = TextEditingController(
+    text: widget.candidate.promotionConditions.join('、'),
+  );
   late DateTime? expiration = widget.candidate.expirationDate;
   late OfferCategory category = widget.candidate.category;
   late bool reminderEnabled = widget.store.reminderDefaults.enabled;
@@ -251,8 +273,11 @@ class _CandidateEditorState extends State<CandidateEditor> {
   void dispose() {
     title.dispose();
     merchant.dispose();
+    brand.dispose();
     description.dispose();
-    value.dispose();
+    originalPrice.dispose();
+    promotionalPrice.dispose();
+    conditions.dispose();
     super.dispose();
   }
 
@@ -291,14 +316,22 @@ class _CandidateEditorState extends State<CandidateEditor> {
           TextFormField(
             key: const Key('import-title-field'),
             controller: title,
-            decoration: const InputDecoration(labelText: '優惠名稱 *'),
+            decoration: _fieldDecoration('優惠名稱 *', '商品名稱'),
             validator: (text) =>
                 text == null || text.trim().isEmpty ? '請輸入優惠名稱' : null,
           ),
           const SizedBox(height: 12),
           TextFormField(
             controller: merchant,
-            decoration: const InputDecoration(labelText: '來源／品牌'),
+            key: const Key('import-merchant-field'),
+            decoration: _fieldDecoration('商家／來源 *', '商家'),
+            validator: (text) =>
+                text == null || text.trim().isEmpty ? '請確認商家／來源' : null,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: brand,
+            decoration: const InputDecoration(labelText: '品牌'),
           ),
           const SizedBox(height: 12),
           InkWell(
@@ -307,6 +340,16 @@ class _CandidateEditorState extends State<CandidateEditor> {
             child: InputDecorator(
               decoration: InputDecoration(
                 labelText: '到期日 *',
+                labelStyle: _isProblem('到期日')
+                    ? TextStyle(color: Theme.of(context).colorScheme.error)
+                    : null,
+                border: _isProblem('到期日')
+                    ? OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      )
+                    : null,
                 errorText: attempted && expiration == null ? '請確認到期日' : null,
               ),
               child: Text(expiration == null ? '尚未辨識，請選擇' : _date(expiration!)),
@@ -321,14 +364,28 @@ class _CandidateEditorState extends State<CandidateEditor> {
             ),
           const SizedBox(height: 12),
           TextFormField(
-            controller: value,
-            decoration: const InputDecoration(labelText: '折扣／價值'),
+            key: const Key('import-original-price-field'),
+            controller: originalPrice,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: '原價（未提供可留空）'),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            key: const Key('import-promotional-price-field'),
+            controller: promotionalPrice,
+            keyboardType: TextInputType.number,
+            decoration: _fieldDecoration('優惠價', '優惠價'),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: conditions,
+            decoration: const InputDecoration(labelText: '優惠條件'),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<OfferCategory>(
             initialValue: category,
             decoration: const InputDecoration(labelText: '分類'),
-            items: OfferCategory.values
+            items: <OfferCategory>{category, ...controlledOfferCategories}
                 .map(
                   (item) => DropdownMenuItem(
                     value: item,
@@ -395,14 +452,33 @@ class _CandidateEditorState extends State<CandidateEditor> {
     setState(() => attempted = true);
     if (!(formKey.currentState?.validate() ?? false) || expiration == null)
       return;
+    final parsedOriginal = int.tryParse(originalPrice.text.replaceAll(',', ''));
+    final parsedPromotional = int.tryParse(
+      promotionalPrice.text.replaceAll(',', ''),
+    );
     final updated = widget.candidate.copyWith(
       title: title.text.trim(),
       merchant: merchant.text.trim(),
+      brand: brand.text.trim(),
       expirationDate: expiration,
       offerDescription: description.text.trim(),
-      valueText: value.text.trim(),
+      originalPrice: parsedOriginal,
+      promotionalPrice: parsedPromotional,
+      clearOriginalPrice: originalPrice.text.trim().isEmpty,
+      clearPromotionalPrice: promotionalPrice.text.trim().isEmpty,
+      savings: parsedOriginal != null && parsedPromotional != null
+          ? parsedOriginal - parsedPromotional
+          : widget.candidate.savings,
+      clearSavings: parsedOriginal == null || parsedPromotional == null,
+      promotionConditions: conditions.text
+          .split(RegExp(r'[、\n]'))
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList(),
       category: category,
       attentionFields: const [],
+      state: CandidateState.ready,
+      selected: true,
     );
     if (widget.onUpdated != null) {
       widget.onUpdated!(updated);
@@ -433,6 +509,24 @@ class _CandidateEditorState extends State<CandidateEditor> {
       ).showSnackBar(const SnackBar(content: Text('匯入失敗，既有優惠沒有變更。')));
     }
   }
+
+  bool _isProblem(String field) =>
+      widget.candidate.attentionFields.any((reason) => reason.contains(field));
+
+  InputDecoration _fieldDecoration(String label, String field) =>
+      InputDecoration(
+        labelText: label,
+        labelStyle: _isProblem(field)
+            ? TextStyle(color: Theme.of(context).colorScheme.error)
+            : null,
+        enabledBorder: _isProblem(field)
+            ? OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              )
+            : null,
+      );
 }
 
 class BatchReviewScreen extends StatefulWidget {
@@ -441,6 +535,8 @@ class BatchReviewScreen extends StatefulWidget {
     required this.failedPages,
     required this.store,
     required this.reminders,
+    this.qualityReport,
+    this.imagePath,
     super.key,
   });
 
@@ -448,13 +544,19 @@ class BatchReviewScreen extends StatefulWidget {
   final int failedPages;
   final OfferStore store;
   final OfferReminderScheduler reminders;
+  final ImportQualityReport? qualityReport;
+  final String? imagePath;
 
   @override
   State<BatchReviewScreen> createState() => _BatchReviewScreenState();
 }
 
 class _BatchReviewScreenState extends State<BatchReviewScreen> {
-  late List<CouponCandidate> candidates = List.from(widget.candidates);
+  late List<CouponCandidate> candidates = List.from(widget.candidates)
+    ..sort((a, b) {
+      if (a.needsReview != b.needsReview) return a.needsReview ? -1 : 1;
+      return a.id.compareTo(b.id);
+    });
   bool needsReviewOnly = false;
   bool saving = false;
 
@@ -465,6 +567,9 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
   @override
   Widget build(BuildContext context) {
     final selected = candidates.where((candidate) => candidate.selected).length;
+    final selectedNeedsReview = candidates
+        .where((candidate) => candidate.selected && candidate.needsReview)
+        .length;
     return Scaffold(
       appBar: AppBar(title: const Text('選擇要匯入的優惠')),
       body: Column(
@@ -473,6 +578,18 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
             MaterialBanner(
               content: Text('${widget.failedPages} 頁辨識失敗，其餘頁面仍可繼續檢查。'),
               actions: [TextButton(onPressed: () {}, child: const Text('知道了'))],
+            ),
+          if (widget.qualityReport != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '可直接匯入 ${widget.qualityReport!.readyCount} 筆・'
+                  '需要確認 ${widget.qualityReport!.needsReviewCount} 筆・'
+                  '已排除 ${widget.qualityReport!.rejectedCount} 筆',
+                ),
+              ),
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -508,19 +625,36 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
                       _replace(candidate.copyWith(selected: value ?? false)),
                   title: Text(
                     candidate.title.isEmpty ? '未辨識名稱' : candidate.title,
+                    style: candidate.needsReview
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontWeight: FontWeight.w700,
+                          )
+                        : null,
                   ),
-                  subtitle: Text(
-                    [
-                      if (candidate.merchant.isNotEmpty) candidate.merchant,
-                      if (candidate.expirationDate != null)
-                        '到期 ${_date(candidate.expirationDate!)}',
-                      if (candidate.sourcePage != null)
-                        '第 ${candidate.sourcePage} 頁',
-                      if (candidate.needsReview) '需要確認',
-                      if (candidate.isBatchDuplicate ||
-                          candidate.isExistingDuplicate)
-                        '疑似重複',
-                    ].join('・'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        [
+                          if (candidate.merchant.isNotEmpty) candidate.merchant,
+                          if (candidate.expirationDate != null)
+                            '到期 ${_date(candidate.expirationDate!)}',
+                          if (candidate.sourcePage != null)
+                            '第 ${candidate.sourcePage} 頁',
+                          if (candidate.isBatchDuplicate ||
+                              candidate.isExistingDuplicate)
+                            '疑似重複',
+                        ].join('・'),
+                      ),
+                      if (candidate.needsReview)
+                        Text(
+                          candidate.attentionFields.join('、'),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                    ],
                   ),
                   secondary: IconButton(
                     tooltip: '編輯',
@@ -537,10 +671,26 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
               padding: const EdgeInsets.all(16),
               child: SizedBox(
                 width: double.infinity,
-                child: FilledButton(
-                  key: const Key('batch-import-button'),
-                  onPressed: selected == 0 || saving ? null : _confirmImport,
-                  child: Text('檢查並匯入 $selected 張'),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('已選擇 $selected 筆，其中 $selectedNeedsReview 筆需要確認'),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        key: const Key('batch-import-button'),
+                        onPressed: selected == 0 || saving
+                            ? null
+                            : _confirmImport,
+                        child: Text(
+                          selectedNeedsReview == 0
+                              ? '匯入 $selected 筆優惠'
+                              : '確認 $selectedNeedsReview 筆後匯入',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -570,6 +720,7 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
           appBar: AppBar(title: const Text('編輯候選優惠')),
           body: CandidateEditor(
             candidate: candidate,
+            imagePath: widget.imagePath,
             store: widget.store,
             reminders: widget.reminders,
             onUpdated: _replace,
@@ -580,18 +731,25 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
   }
 
   Future<void> _confirmImport() async {
-    final selected = candidates
-        .where((candidate) => candidate.selected)
+    var selected = candidates.where((candidate) => candidate.selected).toList();
+    final unresolved = selected
+        .where((candidate) => candidate.needsReview)
         .toList();
+    for (var index = 0; index < unresolved.length; index++) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('還有 ${unresolved.length - index} 筆需要確認')),
+      );
+      await _edit(unresolved[index]);
+    }
+    selected = candidates.where((candidate) => candidate.selected).toList();
     final invalid = selected
-        .where(
-          (candidate) =>
-              candidate.title.isEmpty || candidate.expirationDate == null,
-        )
+        .where((candidate) => !candidate.passesFinalValidation)
         .length;
     if (invalid > 0) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('有 $invalid 張缺少名稱或到期日，請先編輯或取消勾選。')),
+        SnackBar(content: Text('仍有 $invalid 筆關鍵資料未確認，尚未寫入或建立提醒。')),
       );
       return;
     }
@@ -625,11 +783,13 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
                 source: candidate.merchant,
                 note: _note(candidate),
                 category: candidate.category,
+                requiresValidatedImport: true,
               ),
             )
             .toList(),
       );
-      await widget.reminders.sync(widget.store.activeOffers);
+      final granted = await widget.reminders.requestPermission();
+      if (granted) await widget.reminders.sync(widget.store.activeOffers);
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(
@@ -715,12 +875,28 @@ List<CouponCandidate> _markDuplicates(
       selected: !(batchDuplicate || existingDuplicate),
       isBatchDuplicate: batchDuplicate,
       isExistingDuplicate: existingDuplicate,
+      state: batchDuplicate || existingDuplicate
+          ? CandidateState.needsReview
+          : candidate.state,
+      attentionFields: batchDuplicate || existingDuplicate
+          ? {...candidate.attentionFields, '疑似重複商品'}.toList()
+          : candidate.attentionFields,
     );
   }).toList();
 }
 
 String _note(CouponCandidate candidate) => [
-  if (candidate.valueText.isNotEmpty) candidate.valueText,
+  if (candidate.originalPrice != null)
+    '原價：${candidate.originalPrice} 元'
+  else
+    '原價：未提供',
+  if (candidate.promotionalPrice != null) '優惠價：${candidate.promotionalPrice} 元',
+  if (candidate.savings != null) '共省：${candidate.savings} 元',
+  if (candidate.promotionConditions.isNotEmpty)
+    '優惠條件：${candidate.promotionConditions.join('、')}',
+  if (candidate.specification.isNotEmpty) '商品規格：${candidate.specification}',
+  if (candidate.brand.isNotEmpty) '品牌：${candidate.brand}',
+  if (candidate.itemNumber.isNotEmpty) 'ITEM：${candidate.itemNumber}',
   if (candidate.offerDescription.isNotEmpty) candidate.offerDescription,
 ].join('\n');
 
@@ -728,6 +904,21 @@ String _date(DateTime value) =>
     '${value.year}/${value.month.toString().padLeft(2, '0')}/${value.day.toString().padLeft(2, '0')}';
 
 String _category(OfferCategory value) => switch (value) {
+  OfferCategory.foodAndDrink => '食品飲料',
+  OfferCategory.freshAndChilled => '生鮮冷藏',
+  OfferCategory.dailyNecessities => '日用品',
+  OfferCategory.cleaningAndLaundry => '清潔洗衣',
+  OfferCategory.beautyAndCare => '美妝保養',
+  OfferCategory.health => '健康保健',
+  OfferCategory.appliances => '家電',
+  OfferCategory.electronics => '3C 通訊',
+  OfferCategory.homeLiving => '家居生活',
+  OfferCategory.fashion => '服飾鞋包',
+  OfferCategory.baby => '母嬰用品',
+  OfferCategory.pets => '寵物用品',
+  OfferCategory.automotiveAndOutdoor => '汽車戶外',
+  OfferCategory.diningVoucher => '餐飲票券',
+  OfferCategory.travelAndEntertainment => '旅遊娛樂',
   OfferCategory.food => '餐飲',
   OfferCategory.coffee => '咖啡',
   OfferCategory.convenienceStore => '便利商店',
