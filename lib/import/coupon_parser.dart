@@ -262,6 +262,9 @@ class CouponParser {
     if (_contains(value, ['餐廳', '咖啡', '外送', '餐飲票券'])) {
       return OfferCategory.diningVoucher;
     }
+    if (_contains(value, ['星巴克', '拿鐵', 'coffee', 'starbucks'])) {
+      return OfferCategory.diningVoucher;
+    }
     if (_contains(value, ['衛生紙', '生活用品', '日用品', '垃圾袋'])) {
       return OfferCategory.dailyNecessities;
     }
@@ -657,7 +660,7 @@ class CouponParser {
 
   bool _isNonProductLine(String value) =>
       RegExp(
-        r'^(售價以官網為準|線上購物亦有優惠|活動數量有限|售完為止|【?賣場售價】?|商品實際顏色及尺寸以賣場陳列|注意事項|頁碼|第\s*\d+\s*頁)$',
+        r'^(?:.+)?(?:優惠專區|活動專區)$|^(售價以官網為準|線上購物亦有優惠|活動數量有限|售完為止|【?賣場售價】?|商品實際顏色及尺寸以賣場陳列|注意事項|頁碼|第\s*\d+\s*頁)$',
       ).hasMatch(value.trim()) ||
       _looksLikeUiNoise(value) ||
       _itemPattern.hasMatch(value) ||

@@ -60,7 +60,7 @@ void main() {
   test('missing required values produce low-confidence attention fields', () {
     final candidate = parser.parse(page('注意事項\n本券不得兌換現金'));
     expect(candidate.expirationDate, isNull);
-    expect(candidate.attentionFields, contains('到期日'));
+    expect(candidate.attentionFields, contains('缺少到期日'));
     expect(candidate.confidence, ImportConfidence.low);
   });
 
@@ -147,7 +147,7 @@ void main() {
           (candidate) =>
               candidate.title.contains('商品') &&
               candidate.expirationDate == DateTime(2026, 5, 10) &&
-              candidate.valueText.startsWith('-'),
+              candidate.savings != null,
         )
         .length;
 
