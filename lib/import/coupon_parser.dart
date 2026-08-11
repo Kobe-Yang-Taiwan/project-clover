@@ -223,7 +223,7 @@ class CouponParser {
       alternatives: alternatives,
       isAmbiguous:
           alternatives.isNotEmpty && contextual.length != 1 && range == null,
-      yearMissing: yearMissing && selected == null,
+      yearMissing: false,
     );
   }
 

@@ -179,7 +179,7 @@ void main() {
     (tester) async {
       final store = OfferStore(initialOffers: []);
       final reminders = RecordingReminderScheduler();
-      final candidate = CouponCandidate(
+      const candidate = CouponCandidate(
         id: 'review-flow',
         title: '待確認商品',
         merchant: '',
