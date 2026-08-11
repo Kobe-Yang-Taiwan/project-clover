@@ -19,3 +19,14 @@
 - [ ] 實機記錄匯入時間、修正率及點擊數。
 
 上述數值在 Founder 完成標註與實機測試前維持「尚無可驗證數值」，不得猜測。
+
+## Automated validation
+
+- [x] Dart format：21 個檔案，0 個需修改。
+- [x] Flutter Analyze：No issues found。
+- [x] 自動測試：80／80 通過，0 失敗。
+- [x] Android Debug APK：建置成功。
+- [x] GitHub Actions：Run #82 成功。
+- [x] APK artifact：`project-clover-android-debug`，Artifact ID `9111299788`，95,040,951 bytes。
+- [x] Artifact SHA-256：`1ee1ac9b39dc95ca93c27c1242d9bda652ab9fb4d77f71ae19175a6244b4bb41`。
+- [x] Artifact 到期日：2026-08-25。

@@ -21,3 +21,7 @@
 - 維持 Local-first，不加入雲端 OCR、LLM、追蹤或分析服務。
 - 取消與解析失敗不改變既有資料。
 - V0.8 起既有備份分類識別碼仍可還原。
+
+## Build validation
+
+GitHub Actions Run #82 已通過格式、Flutter Analyze、80 項自動測試及 Android Debug APK 建置。APK artifact 為 `project-clover-android-debug`（ID `9111299788`），SHA-256：`1ee1ac9b39dc95ca93c27c1242d9bda652ab9fb4d77f71ae19175a6244b4bb41`。
