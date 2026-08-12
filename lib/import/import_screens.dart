@@ -101,6 +101,7 @@ class _ImageImportScreenState extends State<ImageImportScreen> {
           candidates: candidates,
           failedPages: 0,
           qualityReport: parsed.report,
+          excludedCandidates: parsed.excludedCandidates,
           imagePath: widget.path,
           store: widget.store,
           reminders: widget.reminders,
@@ -176,6 +177,7 @@ class _PdfImportScreenState extends State<PdfImportScreen> {
             candidates: candidates,
             failedPages: pages.where((page) => !page.succeeded).length,
             qualityReport: parsed.report,
+            excludedCandidates: parsed.excludedCandidates,
             store: widget.store,
             reminders: widget.reminders,
           ),
@@ -268,6 +270,8 @@ class _CandidateEditorState extends State<CandidateEditor> {
   late bool reminderEnabled = widget.store.reminderDefaults.enabled;
   bool attempted = false;
   bool saving = false;
+  String? priceError;
+  String? promotionError;
 
   @override
   void dispose() {
@@ -367,14 +371,20 @@ class _CandidateEditorState extends State<CandidateEditor> {
             key: const Key('import-original-price-field'),
             controller: originalPrice,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: '原價（未提供可留空）'),
+            decoration: InputDecoration(
+              labelText: '原價（未提供可留空）',
+              errorText: priceError,
+            ),
           ),
           const SizedBox(height: 12),
           TextFormField(
             key: const Key('import-promotional-price-field'),
             controller: promotionalPrice,
             keyboardType: TextInputType.number,
-            decoration: _fieldDecoration('優惠價', '優惠價'),
+            decoration: _fieldDecoration(
+              '優惠價',
+              '優惠價',
+            ).copyWith(errorText: promotionError ?? priceError),
           ),
           const SizedBox(height: 12),
           TextFormField(
@@ -456,6 +466,35 @@ class _CandidateEditorState extends State<CandidateEditor> {
     final parsedPromotional = int.tryParse(
       promotionalPrice.text.replaceAll(',', ''),
     );
+    final parsedConditions = conditions.text
+        .split(RegExp(r'[、\n]'))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+    final invalidPositiveAmount =
+        (parsedOriginal != null && parsedOriginal <= 0) ||
+        (parsedPromotional != null && parsedPromotional <= 0);
+    final invalidRelationship =
+        parsedOriginal != null &&
+        parsedPromotional != null &&
+        parsedPromotional > parsedOriginal;
+    final missingPromotion =
+        parsedPromotional == null && parsedConditions.isEmpty;
+    if (invalidPositiveAmount || invalidRelationship || missingPromotion) {
+      setState(() {
+        priceError = invalidPositiveAmount
+            ? '價格必須大於 0'
+            : invalidRelationship
+            ? '優惠價不得高於原價'
+            : null;
+        promotionError = missingPromotion ? '請確認優惠價或優惠條件' : null;
+      });
+      return;
+    }
+    setState(() {
+      priceError = null;
+      promotionError = null;
+    });
     final updated = widget.candidate.copyWith(
       title: title.text.trim(),
       merchant: merchant.text.trim(),
@@ -470,16 +509,16 @@ class _CandidateEditorState extends State<CandidateEditor> {
           ? parsedOriginal - parsedPromotional
           : widget.candidate.savings,
       clearSavings: parsedOriginal == null || parsedPromotional == null,
-      promotionConditions: conditions.text
-          .split(RegExp(r'[、\n]'))
-          .map((item) => item.trim())
-          .where((item) => item.isNotEmpty)
-          .toList(),
+      promotionConditions: parsedConditions,
       category: category,
       attentionFields: const [],
       state: CandidateState.ready,
       selected: true,
     );
+    if (!updated.passesFinalValidation) {
+      setState(() => promotionError = '仍有關鍵資料未確認');
+      return;
+    }
     if (widget.onUpdated != null) {
       widget.onUpdated!(updated);
       Navigator.of(context).pop();
@@ -536,6 +575,7 @@ class BatchReviewScreen extends StatefulWidget {
     required this.store,
     required this.reminders,
     this.qualityReport,
+    this.excludedCandidates = const [],
     this.imagePath,
     super.key,
   });
@@ -545,6 +585,7 @@ class BatchReviewScreen extends StatefulWidget {
   final OfferStore store;
   final OfferReminderScheduler reminders;
   final ImportQualityReport? qualityReport;
+  final List<CouponCandidate> excludedCandidates;
   final String? imagePath;
 
   @override
@@ -597,8 +638,8 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
               spacing: 8,
               children: [
                 TextButton(
-                  onPressed: () => _selectAll(true),
-                  child: const Text('全選'),
+                  onPressed: _selectDirectImport,
+                  child: const Text('選取可直接匯入'),
                 ),
                 TextButton(
                   onPressed: () => _selectAll(false),
@@ -610,6 +651,11 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
                   onSelected: (value) =>
                       setState(() => needsReviewOnly = value),
                 ),
+                if (widget.excludedCandidates.isNotEmpty)
+                  TextButton(
+                    onPressed: _showExcluded,
+                    child: Text('查看已排除 ${widget.excludedCandidates.length} 筆'),
+                  ),
               ],
             ),
           ),
@@ -705,6 +751,46 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
         .map((candidate) => candidate.copyWith(selected: value))
         .toList();
   });
+
+  void _selectDirectImport() => setState(() {
+    candidates = candidates
+        .map(
+          (candidate) => candidate.copyWith(
+            selected:
+                candidate.state == CandidateState.ready &&
+                !candidate.isBatchDuplicate &&
+                !candidate.isExistingDuplicate,
+          ),
+        )
+        .toList();
+  });
+
+  Future<void> _showExcluded() => showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: ListView(
+        children: [
+          const ListTile(
+            title: Text('已排除內容'),
+            subtitle: Text('這些片段不會被選取或匯入，可供檢查分類結果。'),
+          ),
+          for (final candidate in widget.excludedCandidates)
+            ListTile(
+              title: Text(candidate.title.isEmpty ? '非商品內容' : candidate.title),
+              subtitle: Text(
+                candidate.rawText.isEmpty ? '沒有可用文字' : candidate.rawText,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: candidate.sourcePage == null
+                  ? null
+                  : Text('第 ${candidate.sourcePage} 頁'),
+            ),
+        ],
+      ),
+    ),
+  );
 
   void _replace(CouponCandidate value) => setState(() {
     final index = candidates.indexWhere(

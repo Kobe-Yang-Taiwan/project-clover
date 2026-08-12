@@ -1,4 +1,20 @@
-# Universal Import Architecture — V0.15
+# Universal Import Architecture — V0.16
+
+## V0.16 common document-understanding pipeline
+
+`Source Adapter → Extraction → Spatial/Layout Analysis → Semantic Block Classification → Product Reconstruction → Field Extraction → Validation → Confidence → Candidate Review → Import`
+
+- Extraction preserves bounding boxes, normalized coordinates, page number and reading order.
+- Layout analysis creates mutually exclusive product cells from reliable ITEM or promotional-price anchors.
+- Every OCR line is classified before it can influence a coupon field.
+- Product-specific fields can only come from the candidate's own `sourceRegionId`.
+- Merchant and explicit catalog validity periods may be shared metadata; arbitrary dates and product-specific fields may not be inherited.
+- Disclaimer, legal, header, footer, payment campaign and page decoration blocks never independently create visible candidates.
+- Final Validation Gate remains the only path to persistence and reminder scheduling.
+
+The invariant is: one real promotional product becomes one candidate; zero real promotional products becomes zero visible candidates.
+
+## V0.15 pipeline history
 
 ## Pipeline
 

@@ -147,7 +147,10 @@ void main() {
           (candidate) =>
               candidate.title.contains('商品') &&
               candidate.expirationDate == DateTime(2026, 5, 10) &&
-              candidate.savings != null,
+              candidate.savings == null &&
+              candidate.promotionConditions.any(
+                (condition) => condition.startsWith('折價'),
+              ),
         )
         .length;
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.0+16 — Import Accuracy & Reconstruction
+
+- 圖片與 PDF 共用 Extract → Segment → Classify → Associate → Reconstruct → Validate 管線。
+- 包裝規格、免責、法規、付款活動、頁首頁尾與 UI 內容不得獨立建立候選。
+- 商品名稱、品牌、ITEM、規格與價格只能取自自己的商品 cell。
+- 共享日期只在明確屬於活動有效期間時繼承，不套用任意頁面日期。
+- 新增已排除內容檢視與 Direct Import 專用批次選取。
+- 新增 Precision、Recall、Field Accuracy、Duplicate Rate、Cross-cell Contamination 與 Review Burden 指標模型。
+
 ## 0.15.0+15 — Smart Universal Import
 
 - 圖片與 PDF 皆以空間商品區域產生多候選；一個真實商品以一筆候選為目標。

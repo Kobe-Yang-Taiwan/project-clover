@@ -153,7 +153,7 @@ void main() {
     );
 
     expect(candidate.state, CandidateState.needsReview);
-    expect(candidate.attentionFields, contains('到期日需要確認'));
+    expect(candidate.attentionFields, contains('缺少到期日'));
     expect(candidate.selected, isFalse);
   });
 

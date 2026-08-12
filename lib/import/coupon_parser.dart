@@ -1,47 +1,112 @@
 import '../models/offer.dart';
 import 'coupon_import_models.dart';
+import 'document_understanding.dart';
 
 class CouponParser {
-  const CouponParser({DateTime Function()? now}) : _now = now;
+  const CouponParser({
+    DateTime Function()? now,
+    DocumentUnderstandingPipeline understanding =
+        const DocumentUnderstandingPipeline(),
+  }) : _now = now,
+       _understanding = understanding;
 
   final DateTime Function()? _now;
+  final DocumentUnderstandingPipeline _understanding;
 
   CouponCandidate parse(
     OcrPageResult page, {
     String? id,
     String documentMerchant = '',
   }) {
-    final lines = page.lines
+    final understood = _understanding.understand(page);
+    final region = understood.regions.isEmpty
+        ? ProductRegion(
+            id: 'p${page.pageNumber ?? 0}-empty',
+            bounds: const OcrRegionBounds(left: 0, top: 0, right: 1, bottom: 1),
+            blocks: const [],
+          )
+        : understood.regions.first;
+    return _reconstruct(
+      page: page,
+      region: region,
+      sharedBlocks: understood.sharedBlocks,
+      id: id ?? region.id,
+      documentMerchant: documentMerchant,
+    ).copyWith(rawText: page.text);
+  }
+
+  CouponCandidate _reconstruct({
+    required OcrPageResult page,
+    required ProductRegion region,
+    required List<ClassifiedOcrLine> sharedBlocks,
+    required String id,
+    required String documentMerchant,
+  }) {
+    final localLines = region.lines
         .map((line) => line.trim())
-        .where((line) => line.isNotEmpty && !_looksLikeUiNoise(line))
+        .where((line) => line.isNotEmpty)
         .toList();
-    final dates = parseDates(lines.join('\n'));
-    final merchant = _extractMerchant(lines, documentMerchant);
-    final brand = _extractBrand(lines);
-    final title = _extractTitle(lines);
-    final prices = _extractPrices(lines);
-    final conditions = _extractConditions(lines);
-    final itemNumber = _extractItemNumber(lines);
+    final identityLines = region.blocks
+        .where((block) => block.type == SemanticBlockType.productName)
+        .map((block) => block.line.text.trim())
+        .where(_isPlausibleTitle)
+        .toList();
+    final title = _extractTitle(identityLines);
+    final sharedText = sharedBlocks
+        .map((block) => block.line.text.trim())
+        .join('\n');
+    final localDateText = region.blocks
+        .where(
+          (block) =>
+              block.type == SemanticBlockType.date &&
+              RegExp(
+                r'優惠期間|活動期間|有效期間|有效期限|使用期限|兌換期限|截止|至\s*\d',
+              ).hasMatch(block.line.text),
+        )
+        .map((block) => block.line.text)
+        .join('\n');
+    final localDates = parseDates(localDateText);
+    final inheritedDates = localDates.selected == null
+        ? _sharedDateInference(sharedText)
+        : const DateInference(selected: null);
+    final dates = localDates.selected != null ? localDates : inheritedDates;
+    final merchant = _extractMerchant([
+      ...sharedBlocks.map((block) => block.line.text.trim()),
+      ...localLines,
+    ], documentMerchant);
+    final brand = _extractBrand(localLines);
+    final prices = _extractPrices(localLines);
+    final conditions = _extractConditions(localLines);
+    final itemNumber = _extractItemNumber(localLines);
     final model = _extractModel(title);
-    final specification = _extractSpecification(lines, title);
+    final specification = _extractSpecification(localLines, title);
 
     final productEvidence = _productEvidence(
       title: title,
       itemNumber: itemNumber,
       model: model,
       prices: prices,
-      lines: lines,
+      lines: localLines,
     );
+    final hasPromotionValue =
+        prices.promotional != null ||
+        prices.savings != null ||
+        conditions.isNotEmpty;
+    final hasCommercialEvidence =
+        hasPromotionValue || prices.ambiguous || prices.conflicting;
     final rejected =
-        productEvidence < 2 ||
-        (title.isEmpty && itemNumber.isEmpty) ||
-        _isNonProductOnly(lines);
+        title.isEmpty ||
+        productEvidence < 3 ||
+        (!hasCommercialEvidence && itemNumber.isEmpty) ||
+        _isNonProductOnly(localLines);
     final attention = <String>[
       if (title.isEmpty) '商品名稱不完整',
       if (title.isNotEmpty && _isIncompleteTitle(title)) '商品名稱不完整',
       if (merchant.isEmpty) '缺少商家／來源',
       if (dates.selected == null) '缺少到期日',
       if (dates.isAmbiguous || dates.yearMissing) '到期日需要確認',
+      if (!hasPromotionValue) '缺少優惠價／優惠內容',
+      if (prices.inferredStandalone) '優惠價需要確認',
       if (prices.ambiguous) '優惠價需要確認',
       if (prices.conflicting) '價格互相衝突',
     ];
@@ -57,7 +122,7 @@ class CouponParser {
         : ImportConfidence.medium;
 
     return CouponCandidate(
-      id: id ?? '${page.pageNumber ?? 0}-${page.text.hashCode}',
+      id: id,
       title: title,
       merchant: merchant,
       brand: brand,
@@ -70,15 +135,18 @@ class CouponParser {
       promotionalPrice: prices.promotional,
       savings: prices.savings,
       promotionConditions: conditions,
-      offerDescription: _extractDescription(lines, title),
+      offerDescription: _extractDescription(localLines, title),
       valueText: _formatValue(prices, conditions),
-      category: suggestCategory('$title $specification ${lines.join(' ')}'),
+      category: suggestCategory(
+        '$title $specification ${localLines.join(' ')}',
+      ),
       sourcePage: page.pageNumber,
       confidence: confidence,
       state: state,
       attentionFields: attention.toSet().toList(),
       alternativeDates: dates.alternatives,
-      rawText: page.text,
+      rawText: localLines.join('\n'),
+      sourceRegionId: region.id,
     );
   }
 
@@ -88,20 +156,36 @@ class CouponParser {
   CouponParseResult parsePagesDetailed(List<OcrPageResult> pages) {
     final watch = Stopwatch()..start();
     final parsed = <CouponCandidate>[];
+    final excluded = <CouponCandidate>[];
     var rawRegions = 0;
-    var rejectedCount = 0;
     for (final page in pages.where((page) => page.succeeded)) {
       final merchant = _detectDocumentMerchant(page.text);
-      final chunks = _splitCandidates(page);
-      rawRegions += chunks.length;
-      for (var index = 0; index < chunks.length; index++) {
-        final candidate = parse(
-          chunks[index],
+      final understood = _understanding.understand(page);
+      for (final block in understood.sharedBlocks.where(
+        (block) =>
+            block.type != SemanticBlockType.merchant &&
+            block.type != SemanticBlockType.date,
+      )) {
+        excluded.add(
+          _excludedBlockCandidate(
+            page: page,
+            block: block,
+            id: '${page.pageNumber ?? 0}-excluded-${block.readingOrder}',
+          ),
+        );
+      }
+      rawRegions += understood.regions.length;
+      for (var index = 0; index < understood.regions.length; index++) {
+        final region = understood.regions[index];
+        final candidate = _reconstruct(
+          page: page,
+          region: region,
+          sharedBlocks: understood.sharedBlocks,
           id: '${page.pageNumber ?? 0}-$index',
           documentMerchant: merchant,
         );
         if (candidate.isRejected) {
-          rejectedCount++;
+          excluded.add(candidate);
         } else {
           parsed.add(candidate);
         }
@@ -118,6 +202,7 @@ class CouponParser {
     watch.stop();
     return CouponParseResult(
       candidates: sorted,
+      excludedCandidates: excluded,
       report: ImportQualityReport(
         rawDetectedRegions: rawRegions,
         readyCount: sorted
@@ -126,7 +211,7 @@ class CouponParser {
         needsReviewCount: sorted
             .where((item) => item.state == CandidateState.needsReview)
             .length,
-        rejectedCount: rejectedCount,
+        rejectedCount: excluded.length,
         mergedFragmentCount: merged.mergedCount,
         finalVisibleCandidateCount: sorted.length,
         missingTitleCount: sorted.where((item) => item.title.isEmpty).length,
@@ -144,8 +229,35 @@ class CouponParser {
           watch.elapsed,
           (total, page) => total + page.duration,
         ),
+        duplicateCandidateCount: merged.mergedCount,
+        crossCellContaminationCount: 0,
       ),
     );
+  }
+
+  CouponCandidate _excludedBlockCandidate({
+    required OcrPageResult page,
+    required ClassifiedOcrLine block,
+    required String id,
+  }) => CouponCandidate(
+    id: id,
+    title: '',
+    merchant: '',
+    rawText: block.line.text.trim(),
+    sourcePage: page.pageNumber,
+    category: OfferCategory.others,
+    confidence: ImportConfidence.high,
+    state: CandidateState.rejected,
+    selected: false,
+    attentionFields: const ['非商品內容'],
+    sourceRegionId: 'p${page.pageNumber ?? 0}-shared',
+  );
+
+  DateInference _sharedDateInference(String text) {
+    if (!RegExp(r'優惠期間|活動期間|有效期間|本期|本檔').hasMatch(text)) {
+      return const DateInference(selected: null);
+    }
+    return parseDates(text);
   }
 
   DateInference parseDates(String text) {
@@ -272,134 +384,6 @@ class CouponParser {
       return OfferCategory.foodAndDrink;
     }
     return OfferCategory.others;
-  }
-
-  List<OcrPageResult> _splitCandidates(OcrPageResult page) {
-    final positioned = page.positionedLines
-        .where((line) => !_looksLikeUiNoise(line.text))
-        .toList();
-    final itemAnchors = positioned
-        .where((line) => _itemPattern.hasMatch(line.text))
-        .toList();
-    if (itemAnchors.isNotEmpty) {
-      final regions = _splitSpatialByAnchors(page, itemAnchors);
-      if (regions.isNotEmpty) return regions;
-    }
-    final priceAnchors = _deduplicatePriceAnchors(
-      positioned.where((line) => _isStandaloneProductPrice(line.text)).toList(),
-    );
-    if (priceAnchors.length > 1) {
-      final regions = _splitSpatialByAnchors(page, priceAnchors);
-      if (regions.length > 1) return regions;
-    }
-    final chunks = page.text
-        .split(RegExp(r'\n\s*(?:-{3,}|={3,}|\*{3,})\s*\n'))
-        .where((chunk) => chunk.trim().isNotEmpty)
-        .toList();
-    if (chunks.length == 1) return [page];
-    return chunks
-        .map(
-          (chunk) => OcrPageResult(
-            sourceType: page.sourceType,
-            pageNumber: page.pageNumber,
-            text: chunk,
-            lines: chunk.split('\n'),
-            succeeded: true,
-            duration: page.duration,
-          ),
-        )
-        .toList();
-  }
-
-  List<OcrPageResult> _splitSpatialByAnchors(
-    OcrPageResult page,
-    List<OcrTextLine> anchors,
-  ) {
-    final sorted = List<OcrTextLine>.from(anchors)
-      ..sort((a, b) => a.centerY.compareTo(b.centerY));
-    final rows = <List<OcrTextLine>>[];
-    for (final anchor in sorted) {
-      if (rows.isEmpty ||
-          (anchor.centerY - _averageY(rows.last)).abs() > 0.12) {
-        rows.add([anchor]);
-      } else {
-        rows.last.add(anchor);
-      }
-    }
-    for (final row in rows) {
-      row.sort((a, b) => a.centerX.compareTo(b.centerX));
-    }
-    final common = page.positionedLines
-        .where((line) => RegExp(r'優惠期間|活動期間|有效期限|使用期限').hasMatch(line.text))
-        .map((line) => line.text.trim())
-        .toSet()
-        .toList();
-    final results = <OcrPageResult>[];
-    for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-      final row = rows[rowIndex];
-      final rowY = _averageY(row);
-      final previousY = rowIndex == 0 ? 0.05 : _averageY(rows[rowIndex - 1]);
-      final nextY = rowIndex == rows.length - 1
-          ? 0.98
-          : _averageY(rows[rowIndex + 1]);
-      final top = rowIndex == 0 ? 0.05 : (previousY + rowY) / 2;
-      final bottom = rowIndex == rows.length - 1 ? 0.98 : (rowY + nextY) / 2;
-      for (var column = 0; column < row.length; column++) {
-        final anchor = row[column];
-        final left = column == 0
-            ? 0.0
-            : (row[column - 1].centerX + anchor.centerX) / 2;
-        final right = column == row.length - 1
-            ? 1.0
-            : (anchor.centerX + row[column + 1].centerX) / 2;
-        final cellLines =
-            page.positionedLines
-                .where(
-                  (line) =>
-                      !_looksLikeUiNoise(line.text) &&
-                      line.centerX >= left &&
-                      line.centerX < right &&
-                      line.centerY >= top &&
-                      line.centerY < bottom,
-                )
-                .toList()
-              ..sort((a, b) {
-                final vertical = a.top.compareTo(b.top);
-                return vertical == 0 ? a.left.compareTo(b.left) : vertical;
-              });
-        final textLines = cellLines
-            .map((line) => line.text.trim())
-            .where((line) => line.isNotEmpty)
-            .toList();
-        if (textLines.isEmpty) continue;
-        final allLines = [...textLines, ...common];
-        results.add(
-          OcrPageResult(
-            sourceType: page.sourceType,
-            pageNumber: page.pageNumber,
-            text: allLines.join('\n'),
-            lines: allLines,
-            succeeded: true,
-            duration: page.duration,
-            positionedLines: cellLines,
-          ),
-        );
-      }
-    }
-    return results;
-  }
-
-  List<OcrTextLine> _deduplicatePriceAnchors(List<OcrTextLine> values) {
-    final result = <OcrTextLine>[];
-    for (final value in values) {
-      final close = result.any(
-        (item) =>
-            (item.centerX - value.centerX).abs() < 0.08 &&
-            (item.centerY - value.centerY).abs() < 0.08,
-      );
-      if (!close) result.add(value);
-    }
-    return result;
   }
 
   _MergedCandidates _mergeFragments(List<CouponCandidate> values) {
@@ -543,8 +527,10 @@ class CouponParser {
         statedSavings ??= _amount(savingsMatch.group(1));
     }
     var ambiguous = false;
+    var inferredStandalone = false;
     if (promotional == null && standalone.length == 1) {
       promotional = standalone.single;
+      inferredStandalone = true;
     } else if (promotional == null && standalone.length > 1) {
       ambiguous = true;
     }
@@ -559,17 +545,29 @@ class CouponParser {
     return _PriceSemantics(
       original: original,
       promotional: promotional,
-      savings: conflicting ? null : calculated ?? statedSavings,
+      savings: conflicting ? null : calculated,
       ambiguous: ambiguous,
       conflicting: conflicting,
+      inferredStandalone: inferredStandalone,
     );
   }
 
   List<String> _extractConditions(List<String> lines) {
     final pattern = RegExp(
-      r'任選\s*\d+\s*[件組]|任\s*\d+\s*組|第[二2]件\s*\d+折|指定(?:信用卡|支付)|會員限定|滿\s*[0-9,]+\s*(?:送|折)\s*[0-9,]+|限量|線上(?:另有|購物亦有)優惠|買.+送',
+      r'任選\s*\d+\s*[件組]|任\s*\d+\s*組|第[二2]件\s*\d+折|指定(?:信用卡|支付)|會員限定|滿\s*[0-9,]+\s*(?:送|折)\s*[0-9,]+|限量|線上(?:另有|購物亦有)優惠|買.+送|(?:現省|省下|折價|折抵|共省|現折)\s*[0-9,]+|^-\s*[0-9][0-9,]*$',
     );
-    return lines.where(pattern.hasMatch).toSet().toList();
+    return lines
+        .where(pattern.hasMatch)
+        .map((line) {
+          final standaloneDiscount = RegExp(
+            r'^-\s*([0-9][0-9,]*)$',
+          ).firstMatch(line.trim());
+          return standaloneDiscount == null
+              ? line
+              : '折價 ${standaloneDiscount.group(1)} 元';
+        })
+        .toSet()
+        .toList();
   }
 
   String _extractItemNumber(List<String> lines) {
@@ -650,7 +648,9 @@ class CouponParser {
     if (itemNumber.isNotEmpty) score += 2;
     if (model.isNotEmpty) score++;
     if (prices.promotional != null || prices.original != null) score++;
-    if (lines.any((line) => RegExp(r'商品|組|入|包|機|器|食品|飲料').hasMatch(line)))
+    if (lines.any(
+      (line) => RegExp(r'商品|產品|優惠券|折價券|分享券|組|機|器|食品|飲料').hasMatch(line),
+    ))
       score++;
     return score;
   }
@@ -711,13 +711,6 @@ class CouponParser {
     r'^(?:原價|原售價|一般售價|定價|優惠價|特價|促銷價|賣場售價|會員價|現省|省下|折價|折抵|共省)?\s*[:：]?\s*(?:NT\$|NT|[$＄]|-)?\s*[0-9][0-9,]*(?:\s*元)?(?:\s*【?賣場售價】?)?$',
     caseSensitive: false,
   ).hasMatch(value.trim());
-  bool _isStandaloneProductPrice(String value) =>
-      !_looksLikeDate(value) &&
-      !_isBundleOrThreshold(value) &&
-      RegExp(
-        r'(?:優惠價|特價|促銷價|賣場售價|會員價|NT\$|[$＄])\s*[0-9][0-9,]*|^\s*[0-9][0-9,]{2,}\s*元?\s*$',
-        caseSensitive: false,
-      ).hasMatch(value);
   bool _isBundleOrThreshold(String value) =>
       RegExp(r'任選|任\s*\d+|第[二2]件|滿\s*[0-9,]+|平均|每(?:件|組|入)|單價').hasMatch(value);
 
@@ -735,8 +728,6 @@ class CouponParser {
   };
   String _fingerprintTitle(String value) =>
       value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9\u4e00-\u9fff]'), '');
-  double _averageY(List<OcrTextLine> lines) =>
-      lines.map((line) => line.centerY).reduce((a, b) => a + b) / lines.length;
   bool _contains(String text, List<String> terms) => terms.any(text.contains);
   bool _sameDate(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
@@ -764,6 +755,7 @@ class _PriceSemantics {
     required this.savings,
     required this.ambiguous,
     required this.conflicting,
+    required this.inferredStandalone,
   });
 
   final int? original;
@@ -771,6 +763,7 @@ class _PriceSemantics {
   final int? savings;
   final bool ambiguous;
   final bool conflicting;
+  final bool inferredStandalone;
 }
 
 class _MergedCandidates {

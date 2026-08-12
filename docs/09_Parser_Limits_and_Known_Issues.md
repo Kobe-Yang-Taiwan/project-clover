@@ -1,4 +1,14 @@
-# V0.15 Known Limitations
+# Parser Limits and Known Issues
+
+## V0.16 known limitations
+
+- Device OCR still determines which characters are available; severely blurred or missing text cannot be recovered.
+- Product cards without ITEM, explicit promotional price or visual separation may remain `NEEDS_CONFIRMATION` or `EXCLUDED` rather than being guessed.
+- Irregular free-form layouts require Founder-labelled fixtures before safe direct-import coverage expands.
+- Real Founder Costco PDF and supermarket screenshot metrics remain pending Android rerun; no production accuracy value is invented.
+- The app intentionally prefers fewer correct candidates over a large uncertain list.
+
+## V0.15 historical limitations
 
 1. 通用 OCR 自動辨識不宣稱 100%。V0.15 的 100% 指寫入資料均通過系統驗證或使用者明確確認。
 2. 嚴重模糊、反光、手寫、藝術字、文字與圖片大幅重疊仍可能造成 `NEEDS REVIEW` 或漏候選。

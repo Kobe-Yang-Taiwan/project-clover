@@ -6,6 +6,27 @@ enum ImportConfidence { high, medium, low }
 
 enum CandidateState { ready, needsReview, rejected }
 
+enum SemanticBlockType {
+  product,
+  productName,
+  brand,
+  specification,
+  itemNumber,
+  originalPrice,
+  promoPrice,
+  discount,
+  promotion,
+  date,
+  merchant,
+  header,
+  footer,
+  disclaimer,
+  legal,
+  paymentCampaign,
+  pageDecoration,
+  unknown,
+}
+
 class OcrTextLine {
   const OcrTextLine({
     required this.text,
@@ -23,6 +44,38 @@ class OcrTextLine {
 
   double get centerX => (left + right) / 2;
   double get centerY => (top + bottom) / 2;
+
+  bool overlaps(OcrRegionBounds bounds) =>
+      centerX >= bounds.left &&
+      centerX < bounds.right &&
+      centerY >= bounds.top &&
+      centerY < bounds.bottom;
+}
+
+class OcrRegionBounds {
+  const OcrRegionBounds({
+    required this.left,
+    required this.top,
+    required this.right,
+    required this.bottom,
+  });
+
+  final double left;
+  final double top;
+  final double right;
+  final double bottom;
+}
+
+class ClassifiedOcrLine {
+  const ClassifiedOcrLine({
+    required this.line,
+    required this.type,
+    required this.readingOrder,
+  });
+
+  final OcrTextLine line;
+  final SemanticBlockType type;
+  final int readingOrder;
 }
 
 class OcrPageResult {
@@ -90,6 +143,7 @@ class CouponCandidate {
     bool? selected,
     this.isBatchDuplicate = false,
     this.isExistingDuplicate = false,
+    this.sourceRegionId = '',
   }) : selected = selected ?? state == CandidateState.ready;
 
   final String id;
@@ -117,14 +171,44 @@ class CouponCandidate {
   final bool selected;
   final bool isBatchDuplicate;
   final bool isExistingDuplicate;
+  final String sourceRegionId;
+
+  String get productName => title;
+  DateTime? get validFrom => startDate;
+  DateTime? get validUntil => expirationDate;
+  int? get promoPrice => promotionalPrice;
+  int? get discountAmount => savings;
+  List<String> get promotionCondition => promotionConditions;
+  String get notes => offerDescription;
+  List<String> get validationIssues => attentionFields;
 
   bool get needsReview => state == CandidateState.needsReview;
   bool get isRejected => state == CandidateState.rejected;
+  bool get hasValidPriceRelationship {
+    if (originalPrice != null && originalPrice! <= 0) return false;
+    if (promotionalPrice != null && promotionalPrice! <= 0) return false;
+    if (originalPrice != null &&
+        promotionalPrice != null &&
+        promotionalPrice! > originalPrice!) {
+      return false;
+    }
+    if (savings != null) {
+      if (originalPrice == null || promotionalPrice == null) return false;
+      if (savings != originalPrice! - promotionalPrice!) return false;
+    }
+    return true;
+  }
+
+  bool get hasPromotionValue =>
+      promotionalPrice != null || promotionConditions.isNotEmpty;
+
   bool get passesFinalValidation =>
       state != CandidateState.rejected &&
       title.trim().isNotEmpty &&
       merchant.trim().isNotEmpty &&
       expirationDate != null &&
+      hasPromotionValue &&
+      hasValidPriceRelationship &&
       attentionFields.isEmpty;
 
   CouponCandidate copyWith({
@@ -150,6 +234,8 @@ class CouponCandidate {
     bool? selected,
     bool? isBatchDuplicate,
     bool? isExistingDuplicate,
+    String? sourceRegionId,
+    String? rawText,
     bool clearOriginalPrice = false,
     bool clearPromotionalPrice = false,
     bool clearSavings = false,
@@ -180,10 +266,11 @@ class CouponCandidate {
       state: state ?? this.state,
       attentionFields: attentionFields ?? this.attentionFields,
       alternativeDates: alternativeDates ?? this.alternativeDates,
-      rawText: rawText,
+      rawText: rawText ?? this.rawText,
       selected: selected ?? this.selected,
       isBatchDuplicate: isBatchDuplicate ?? this.isBatchDuplicate,
       isExistingDuplicate: isExistingDuplicate ?? this.isExistingDuplicate,
+      sourceRegionId: sourceRegionId ?? this.sourceRegionId,
     );
   }
 }
@@ -200,6 +287,11 @@ class ImportQualityReport {
     required this.missingDateCount,
     required this.ambiguousPriceCount,
     required this.processingDuration,
+    this.actualProductCount,
+    this.falseCandidateCount,
+    this.missedProductCount,
+    this.duplicateCandidateCount = 0,
+    this.crossCellContaminationCount = 0,
   });
 
   final int rawDetectedRegions;
@@ -212,13 +304,74 @@ class ImportQualityReport {
   final int missingDateCount;
   final int ambiguousPriceCount;
   final Duration processingDuration;
+  final int? actualProductCount;
+  final int? falseCandidateCount;
+  final int? missedProductCount;
+  final int duplicateCandidateCount;
+  final int crossCellContaminationCount;
+
+  int get generatedCandidateCount => finalVisibleCandidateCount;
+  double get reviewBurden =>
+      actualProductCount == null || actualProductCount == 0
+      ? finalVisibleCandidateCount.toDouble()
+      : finalVisibleCandidateCount / actualProductCount!;
 }
 
 class CouponParseResult {
-  const CouponParseResult({required this.candidates, required this.report});
+  const CouponParseResult({
+    required this.candidates,
+    required this.report,
+    this.excludedCandidates = const [],
+  });
 
   final List<CouponCandidate> candidates;
+  final List<CouponCandidate> excludedCandidates;
   final ImportQualityReport report;
+}
+
+class LabeledImportQualityMetrics {
+  const LabeledImportQualityMetrics({
+    required this.actualProductCount,
+    required this.generatedCandidateCount,
+    required this.matchedProductCount,
+    required this.falseCandidateCount,
+    required this.missedProductCount,
+    required this.directImportCount,
+    required this.needsConfirmationCount,
+    required this.excludedCount,
+    required this.duplicateCandidateCount,
+    required this.crossCellContaminationCount,
+    required this.correctRequiredFieldCount,
+    required this.evaluatedRequiredFieldCount,
+  });
+
+  final int actualProductCount;
+  final int generatedCandidateCount;
+  final int matchedProductCount;
+  final int falseCandidateCount;
+  final int missedProductCount;
+  final int directImportCount;
+  final int needsConfirmationCount;
+  final int excludedCount;
+  final int duplicateCandidateCount;
+  final int crossCellContaminationCount;
+  final int correctRequiredFieldCount;
+  final int evaluatedRequiredFieldCount;
+
+  double get candidatePrecision => generatedCandidateCount == 0
+      ? (actualProductCount == 0 ? 1 : 0)
+      : matchedProductCount / generatedCandidateCount;
+  double get candidateRecall =>
+      actualProductCount == 0 ? 1 : matchedProductCount / actualProductCount;
+  double get fieldAccuracy => evaluatedRequiredFieldCount == 0
+      ? 1
+      : correctRequiredFieldCount / evaluatedRequiredFieldCount;
+  double get duplicateRate => actualProductCount == 0
+      ? 0
+      : duplicateCandidateCount / actualProductCount;
+  double get reviewBurden => actualProductCount == 0
+      ? generatedCandidateCount.toDouble()
+      : generatedCandidateCount / actualProductCount;
 }
 
 class ImportProgress {

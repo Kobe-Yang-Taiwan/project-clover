@@ -92,6 +92,7 @@ void main() {
       sourcePage: null,
       category: OfferCategory.coffee,
       confidence: ImportConfidence.high,
+      promotionConditions: const ['買一送一'],
       attentionFields: const [],
     );
     await tester.pumpWidget(
@@ -174,6 +175,55 @@ void main() {
     expect(reviewText.style?.color, isNotNull);
     expect(store.allOffers, isEmpty);
     expect(reminders.syncCount, 0);
+  });
+
+  testWidgets('excluded fragments stay hidden but can be inspected', (
+    tester,
+  ) async {
+    final store = OfferStore(initialOffers: []);
+    final reminders = RecordingReminderScheduler();
+    final ready = CouponCandidate(
+      id: 'direct',
+      title: '可直接匯入商品',
+      merchant: 'Costco 好市多',
+      promotionalPrice: 299,
+      expirationDate: DateTime.now().add(const Duration(days: 30)),
+      rawText: '可直接匯入商品',
+      sourcePage: 1,
+      category: OfferCategory.foodAndDrink,
+      confidence: ImportConfidence.high,
+      attentionFields: const [],
+    );
+    const excluded = CouponCandidate(
+      id: 'excluded',
+      title: '',
+      merchant: '',
+      rawText: '商品實際包裝以賣場陳列為準',
+      sourcePage: 1,
+      category: OfferCategory.others,
+      confidence: ImportConfidence.high,
+      state: CandidateState.rejected,
+      selected: false,
+      attentionFields: ['非商品內容'],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BatchReviewScreen(
+          candidates: [ready],
+          excludedCandidates: const [excluded],
+          failedPages: 0,
+          store: store,
+          reminders: reminders,
+        ),
+      ),
+    );
+
+    expect(find.text('商品實際包裝以賣場陳列為準'), findsNothing);
+    await tester.tap(find.text('查看已排除 1 筆'));
+    await tester.pumpAndSettle();
+    expect(find.text('商品實際包裝以賣場陳列為準'), findsOneWidget);
+    expect(store.allOffers, isEmpty);
   });
 
   testWidgets(
