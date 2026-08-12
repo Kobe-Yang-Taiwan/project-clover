@@ -2,6 +2,15 @@
 
 Test version: `0.16.0 (Build 16)`
 
+## Engineering gate evidence
+
+- [x] GitHub Actions run #89 passed formatting and Flutter static analysis.
+- [x] All 103 automated tests passed, including V0.15 failure regressions.
+- [x] Android Build 16 debug APK was built and uploaded as `project-clover-android-debug`.
+- [x] Automated fixtures cover non-product rejection, cross-cell isolation,
+  multi-product reconstruction, no fabricated price/date, and final import validation.
+- [ ] Real-device Founder dataset validation is complete.
+
 ## Costco PDF
 
 - [ ] Package counts such as `36包入(CT)` do not appear as candidates.

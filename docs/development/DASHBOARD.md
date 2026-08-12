@@ -5,15 +5,15 @@ _Last updated: 2026-08-12_
 ## Executive Status
 
 - Current version: V0.16 — Import Accuracy & Reconstruction
-- Current state: CI_BUILD (blocked by CI analyze failure)
+- Current state: FOUNDER_TEST
 - Development branch: `agent/flutter-prototype-v0`
 - Draft PR: #1 (Open, Draft, not merged)
-- Current remote head: `528b0f178fefda6689504e1ccd196296b5f39ee6`
+- CI evidence head: `276ec73fa145d758608bf1c6b70700d0aa8f50cc`
 - V0.16 implementation: integrated into remote branch
-- CI: failed at Flutter Analyze
-- CI blocker: `Undefined name 'OfferCategory'` in `test/v016_reconstruction_test.dart:226`
-- Tests/build in failed CI run: skipped after analyze failure
-- Founder Acceptance: pending Build 16 Android APK
+- CI: GitHub Actions run #89 passed
+- CI verification: format passed, analyze passed, 103 tests passed
+- Android artifact: Build 16 debug APK uploaded as `project-clover-android-debug`
+- Founder Acceptance: pending real-device Costco PDF and multi-product image validation
 
 ## Product Progress
 
@@ -59,23 +59,18 @@ _Last updated: 2026-08-12_
 | G0 | Approved scope/spec | PASS |
 | G1 | Repo/worktree inspection | PASS |
 | G2 | Implementation | PASS |
-| G3 | Local QA | PASS (Codex reported 102/102 locally before integration) |
+| G3 | Local QA | PASS (102/102 baseline before final gate follow-up; formatter and diff checks passed afterward) |
 | G4 | Commit / integration | PASS |
 | G5 | Release authorization | PASS |
-| G6 | GitHub CI + Android APK | BLOCKED — Analyze failure |
+| G6 | GitHub CI + Android APK | PASS — run #89, 103 tests, Build 16 artifact |
 | G7 | Founder Android Acceptance | WAITING |
 | G8 | Accepted / Release-ready | NOT STARTED |
 
-## Current P0 Blocker
+## Current Acceptance Work
 
-GitHub Actions run #87 fails at `flutter analyze` because test code references an undefined `OfferCategory` symbol in `test/v016_reconstruction_test.dart:226`.
+The run #87 analyze failure was fixed by importing the enum used by the final-validation regression test. Run #89 subsequently passed format, analyze, all 103 tests, Android Build 16, and artifact upload.
 
-Required next action:
-1. Fix the test/import/reference.
-2. Re-run Flutter Analyze.
-3. Run all V0.16 tests.
-4. Build Build 16 Android APK.
-5. Founder re-tests the same supermarket screenshot and Costco PDF.
+No automated P0 regression is currently known. G7 still requires the Founder to install Build 16 and re-test the representative supermarket screenshot and Costco PDF. Record labelled precision, recall, field accuracy, duplicate rate, cross-cell contamination, and review burden; do not infer production accuracy from synthetic fixtures.
 
 ## Google Play Launch Roadmap
 
