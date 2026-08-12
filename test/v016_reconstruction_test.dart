@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:project_clover/import/coupon_import_models.dart';
 import 'package:project_clover/import/coupon_parser.dart';
+import 'package:project_clover/models/offer.dart';
 
 void main() {
   const parser = CouponParser();
