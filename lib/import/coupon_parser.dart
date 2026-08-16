@@ -75,7 +75,10 @@ class CouponParser {
       ...localLines,
     ], documentMerchant);
     final brand = _extractBrand(localLines);
-    final prices = _extractPrices(localLines);
+    var prices = _extractPrices(localLines);
+    if (page.extractionMethod == ImportExtractionMethod.nativePdfText) {
+      prices = _extractNativeSpatialPrices(region, prices);
+    }
     final conditions = _extractConditions(localLines);
     final itemNumber = _extractItemNumber(localLines);
     final model = _extractModel(title);
@@ -147,11 +150,389 @@ class CouponParser {
       alternativeDates: dates.alternatives,
       rawText: localLines.join('\n'),
       sourceRegionId: region.id,
+      fieldEvidence: _localFieldEvidence(
+        page: page,
+        region: region,
+        sharedBlocks: sharedBlocks,
+        title: title,
+        merchant: merchant,
+        brand: brand,
+        model: model,
+        specification: specification,
+        itemNumber: itemNumber,
+        startDate: dates.start,
+        expirationDate: dates.selected,
+        originalPrice: prices.original,
+        promotionalPrice: prices.promotional,
+        savings: prices.savings,
+      ),
     );
   }
 
   List<CouponCandidate> parsePages(List<OcrPageResult> pages) =>
       parsePagesDetailed(pages).candidates;
+
+  CouponParseResult parseAdaptive(SourceAdaptiveImportResult source) {
+    final cloudSucceeded =
+        source.cloudUsage.requestCount > 0 && !source.localFallbackUsed;
+    final localPages = source.pages
+        .where(
+          (page) =>
+              page.extractionMethod != ImportExtractionMethod.cloudVision &&
+              !(source.route == ImportRoute.promotionalImage && cloudSucceeded),
+        )
+        .toList();
+    final local = parsePagesDetailed(localPages);
+    final canonical = <CouponCandidate>[];
+    final excluded = <CouponCandidate>[...local.excludedCandidates];
+    var contaminationCount = 0;
+    for (var index = 0; index < source.products.length; index++) {
+      final reconstructed = _candidateFromCanonical(
+        source.products[index],
+        index,
+      );
+      contaminationCount += reconstructed.contaminationCount;
+      if (reconstructed.candidate.isRejected) {
+        excluded.add(reconstructed.candidate);
+      } else {
+        canonical.add(reconstructed.candidate);
+      }
+    }
+    final candidates = <CouponCandidate>[...local.candidates, ...canonical]
+      ..sort((a, b) {
+        final state = _stateOrder(a.state).compareTo(_stateOrder(b.state));
+        if (state != 0) return state;
+        final page = (a.sourcePage ?? 0).compareTo(b.sourcePage ?? 0);
+        return page != 0 ? page : a.sourceRegionId.compareTo(b.sourceRegionId);
+      });
+    return CouponParseResult(
+      candidates: candidates,
+      excludedCandidates: excluded,
+      report: ImportQualityReport(
+        rawDetectedRegions:
+            local.report.rawDetectedRegions + source.products.length,
+        readyCount: candidates
+            .where((item) => item.state == CandidateState.ready)
+            .length,
+        needsReviewCount: candidates
+            .where((item) => item.state == CandidateState.needsReview)
+            .length,
+        rejectedCount: excluded.length,
+        mergedFragmentCount: local.report.mergedFragmentCount,
+        finalVisibleCandidateCount: candidates.length,
+        missingTitleCount: candidates
+            .where((item) => item.title.isEmpty)
+            .length,
+        missingDateCount: candidates
+            .where((item) => item.expirationDate == null)
+            .length,
+        ambiguousPriceCount: candidates
+            .where(
+              (item) => item.attentionFields.any(
+                (reason) => reason.contains('價格') || reason.contains('優惠價'),
+              ),
+            )
+            .length,
+        processingDuration: local.report.processingDuration,
+        duplicateCandidateCount: local.report.duplicateCandidateCount,
+        crossCellContaminationCount:
+            local.report.crossCellContaminationCount + contaminationCount,
+        cloudUsage: source.cloudUsage,
+      ),
+    );
+  }
+
+  _CanonicalCandidate _candidateFromCanonical(
+    ReconstructedProduct product,
+    int index,
+  ) {
+    final productBounds = product.regionEvidence?.bounds;
+    final productSpecificEvidence = <FieldEvidence?>[
+      product.regionEvidence,
+      product.productName.evidence,
+      product.brand?.evidence,
+      product.model?.evidence,
+      product.specification?.evidence,
+      product.itemNumber?.evidence,
+      product.originalPrice?.evidence,
+      product.promotionalPrice?.evidence,
+      product.discountAmount?.evidence,
+    ].whereType<FieldEvidence>();
+    final sharedEligibleEvidence = <FieldEvidence?>[
+      product.merchant?.evidence,
+      product.validFrom?.evidence,
+      product.validUntil?.evidence,
+      product.promotionCondition?.evidence,
+    ].whereType<FieldEvidence>();
+    final ownershipViolation =
+        productSpecificEvidence.any(
+          (evidence) =>
+              evidence.regionId != product.regionId ||
+              (productBounds != null &&
+                  evidence.bounds != null &&
+                  !_boundsContain(productBounds, evidence.bounds!)),
+        ) ||
+        sharedEligibleEvidence.any(
+          (evidence) =>
+              evidence.sourcePage != product.sourcePage ||
+              (evidence.regionId != product.regionId &&
+                  !_isSharedEvidenceRegion(evidence.regionId)),
+        );
+    final baseName = product.productName.value.trim();
+    final identityParts = <String>[
+      if (_reliableText(product.brand)) product.brand!.value.trim(),
+      baseName,
+      if (_reliableText(product.model)) product.model!.value.trim(),
+      if (_reliableText(product.specification))
+        product.specification!.value.trim(),
+    ];
+    final title = _joinIdentity(identityParts);
+    final merchant = product.merchant?.value.trim() ?? '';
+    final original = _reliableInt(product.originalPrice);
+    final promotional = _reliableInt(product.promotionalPrice);
+    final explicitDiscount = _reliableInt(product.discountAmount);
+    final derivedDiscount = original != null && promotional != null
+        ? original - promotional
+        : null;
+    final discountConflict =
+        explicitDiscount != null &&
+        derivedDiscount != null &&
+        explicitDiscount != derivedDiscount;
+    final discount =
+        discountConflict || (derivedDiscount != null && derivedDiscount <= 0)
+        ? null
+        : derivedDiscount ?? explicitDiscount;
+    final condition = product.promotionCondition?.value.trim();
+    final conditions = condition == null || condition.isEmpty
+        ? const <String>[]
+        : <String>[condition];
+    final nonProduct = _isCanonicalNonProduct(title);
+    final attention = <String>[
+      if (title.isEmpty || _isIncompleteTitle(title)) '商品名稱不完整',
+      if (product.productName.evidence.confidence < 0.75) '商品名稱需要確認',
+      if (merchant.isEmpty) '缺少商家／來源',
+      if (product.merchant != null &&
+          product.merchant!.evidence.confidence < 0.75)
+        '商家／來源需要確認',
+      if (product.validUntil == null) '缺少到期日',
+      if (product.validUntil != null &&
+          product.validUntil!.evidence.confidence < 0.75)
+        '到期日需要確認',
+      if (promotional == null && conditions.isEmpty) '缺少優惠價／優惠內容',
+      if (product.promotionalPrice != null && promotional == null) '優惠價需要確認',
+      if (original != null && promotional != null && promotional > original)
+        '價格互相衝突',
+      if (discountConflict) '折扣與價格互相衝突',
+      if (ownershipViolation) '跨商品欄位污染',
+    ];
+    final rejected =
+        ownershipViolation || nonProduct || baseName.isEmpty || title.isEmpty;
+    final state = rejected
+        ? CandidateState.rejected
+        : attention.isEmpty
+        ? CandidateState.ready
+        : CandidateState.needsReview;
+    final evidenceText = product.allEvidence
+        .map((evidence) => evidence.rawText.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .join('\n');
+    return _CanonicalCandidate(
+      contaminationCount: ownershipViolation ? 1 : 0,
+      candidate: CouponCandidate(
+        id: 'canonical-${product.sourcePage ?? 0}-$index',
+        title: title,
+        merchant: merchant,
+        brand: product.brand?.value.trim() ?? '',
+        model: product.model?.value.trim() ?? '',
+        specification: product.specification?.value.trim() ?? '',
+        itemNumber: product.itemNumber?.value.trim() ?? '',
+        startDate: product.validFrom?.value,
+        expirationDate: product.validUntil?.value,
+        originalPrice: original,
+        promotionalPrice: promotional,
+        savings: discount,
+        promotionConditions: conditions,
+        offerDescription: product.notes?.value.trim() ?? '',
+        valueText: _formatCanonicalValue(
+          original: original,
+          promotional: promotional,
+          discount: discount,
+          conditions: conditions,
+        ),
+        category: suggestCategory('$title ${product.category?.value ?? ''}'),
+        sourcePage: product.sourcePage,
+        confidence: state == CandidateState.ready
+            ? ImportConfidence.high
+            : state == CandidateState.rejected
+            ? ImportConfidence.low
+            : ImportConfidence.medium,
+        state: state,
+        attentionFields: attention.toSet().toList(),
+        rawText: evidenceText,
+        selected: state == CandidateState.ready,
+        sourceRegionId: product.regionId,
+        fieldEvidence: {
+          'product_name': product.productName.evidence,
+          if (product.merchant != null) 'merchant': product.merchant!.evidence,
+          if (product.brand != null) 'brand': product.brand!.evidence,
+          if (product.model != null) 'model': product.model!.evidence,
+          if (product.specification != null)
+            'specification': product.specification!.evidence,
+          if (product.itemNumber != null)
+            'item_number': product.itemNumber!.evidence,
+          if (product.validFrom != null)
+            'valid_from': product.validFrom!.evidence,
+          if (product.validUntil != null)
+            'valid_until': product.validUntil!.evidence,
+          if (product.originalPrice != null)
+            'original_price': product.originalPrice!.evidence,
+          if (product.promotionalPrice != null)
+            'promo_price': product.promotionalPrice!.evidence,
+          if (product.discountAmount != null)
+            'discount_amount': product.discountAmount!.evidence,
+          if (product.promotionCondition != null)
+            'promotion_condition': product.promotionCondition!.evidence,
+        },
+      ),
+    );
+  }
+
+  Map<String, FieldEvidence> _localFieldEvidence({
+    required OcrPageResult page,
+    required ProductRegion region,
+    required List<ClassifiedOcrLine> sharedBlocks,
+    required String title,
+    required String merchant,
+    required String brand,
+    required String model,
+    required String specification,
+    required String itemNumber,
+    required DateTime? startDate,
+    required DateTime? expirationDate,
+    required num? originalPrice,
+    required num? promotionalPrice,
+    required num? savings,
+  }) {
+    final confidence =
+        page.extractionMethod == ImportExtractionMethod.nativePdfText
+        ? 0.95
+        : 0.70;
+    FieldEvidence local(String rawText) => FieldEvidence(
+      sourceType: page.sourceType,
+      extractionMethod: page.extractionMethod,
+      sourcePage: page.pageNumber,
+      regionId: region.id,
+      rawText: rawText,
+      confidence: confidence,
+      bounds: region.bounds,
+    );
+    FieldEvidence shared(String rawText) => FieldEvidence(
+      sourceType: page.sourceType,
+      extractionMethod: page.extractionMethod,
+      sourcePage: page.pageNumber,
+      regionId: 'p${page.pageNumber ?? 0}-shared',
+      rawText: rawText,
+      confidence: confidence,
+    );
+    final sharedText = sharedBlocks
+        .map((block) => block.line.text.trim())
+        .where((value) => value.isNotEmpty)
+        .join('\n');
+    return {
+      if (title.isNotEmpty) 'product_name': local(title),
+      if (merchant.isNotEmpty) 'merchant': shared(merchant),
+      if (brand.isNotEmpty) 'brand': local(brand),
+      if (model.isNotEmpty) 'model': local(model),
+      if (specification.isNotEmpty) 'specification': local(specification),
+      if (itemNumber.isNotEmpty) 'item_number': local(itemNumber),
+      if (startDate != null) 'valid_from': shared(sharedText),
+      if (expirationDate != null) 'valid_until': shared(sharedText),
+      if (originalPrice != null)
+        'original_price': local(_rawLineForAmount(region, originalPrice)),
+      if (promotionalPrice != null)
+        'promo_price': local(_rawLineForAmount(region, promotionalPrice)),
+      if (savings != null)
+        'discount_amount': local(_rawLineForAmount(region, savings)),
+    };
+  }
+
+  String _rawLineForAmount(ProductRegion region, num amount) {
+    final digits = amount.toString().replaceAll(RegExp(r'\.0$'), '');
+    for (final line in region.lines) {
+      if (line.replaceAll(',', '').contains(digits)) return line;
+    }
+    return digits;
+  }
+
+  bool _reliableText(EvidencedValue<String>? value) =>
+      value != null &&
+      value.value.trim().isNotEmpty &&
+      value.evidence.isUsable &&
+      value.evidence.confidence >= 0.65;
+
+  num? _reliableInt(EvidencedValue<num>? value) =>
+      value != null &&
+          value.value > 0 &&
+          value.evidence.isUsable &&
+          value.evidence.confidence >= 0.75 &&
+          !RegExp(
+            r'平均|單價|每(?:件|組|包|瓶|罐)|滿\s*[0-9,]+|回饋|紅利|點數',
+          ).hasMatch(value.evidence.rawText)
+      ? value.value
+      : null;
+
+  bool _boundsContain(OcrRegionBounds region, OcrRegionBounds field) {
+    const tolerance = 0.005;
+    return field.left >= region.left - tolerance &&
+        field.top >= region.top - tolerance &&
+        field.right <= region.right + tolerance &&
+        field.bottom <= region.bottom + tolerance;
+  }
+
+  bool _isSharedEvidenceRegion(String regionId) => RegExp(
+    r'(?:shared|page|campaign|banner)',
+    caseSensitive: false,
+  ).hasMatch(regionId);
+
+  String _joinIdentity(List<String> values) {
+    final result = <String>[];
+    for (final value in values) {
+      final clean = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (clean.isEmpty) continue;
+      final lower = clean.toLowerCase();
+      final duplicate = result.indexWhere((existing) {
+        final existingLower = existing.toLowerCase();
+        return existingLower.contains(lower) || lower.contains(existingLower);
+      });
+      if (duplicate >= 0) {
+        if (clean.length > result[duplicate].length) result[duplicate] = clean;
+        continue;
+      }
+      result.add(clean);
+    }
+    return result.join(' ').trim();
+  }
+
+  bool _isCanonicalNonProduct(String value) => RegExp(
+    r'^(?:【?賣場售價】?|僅限好市多|售價以官網為準|商品實際(?:包裝|顏色|尺寸).+|注意事項|活動辦法|信用卡.+|\d+(?:\.\d+)?\s*(?:g|kg|ml|l|包|瓶|罐|個|袋|盒|組|入).*)$',
+    caseSensitive: false,
+  ).hasMatch(value.trim());
+
+  String _formatCanonicalValue({
+    required num? original,
+    required num? promotional,
+    required num? discount,
+    required List<String> conditions,
+  }) {
+    final values = <String>[
+      if (original != null) '原價：$original 元',
+      if (promotional != null) '優惠價：$promotional 元',
+      if (discount != null) '共省：$discount 元',
+      ...conditions,
+    ];
+    return values.join('｜');
+  }
 
   CouponParseResult parsePagesDetailed(List<OcrPageResult> pages) {
     final watch = Stopwatch()..start();
@@ -495,9 +876,9 @@ class CouponParser {
   }
 
   _PriceSemantics _extractPrices(List<String> lines) {
-    int? labeled(String labels) {
+    num? labeled(String labels) {
       final pattern = RegExp(
-        '(?:$labels)\\s*[:：]?\\s*(?:NT[\u0024]|NT|[\u0024＄])?\\s*([0-9][0-9,]*)',
+        '(?:$labels)\\s*[:：]?\\s*(?:NT[\u0024]|NT|[\u0024＄])?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?)',
         caseSensitive: false,
       );
       for (final line in lines) {
@@ -510,7 +891,7 @@ class CouponParser {
     final original = labeled('原價|原售價|一般售價|定價');
     var promotional = labeled('優惠價|特價|促銷價|賣場售價|會員價');
     var statedSavings = labeled('現省|省下|折價|折抵|共省');
-    final standalone = <int>[];
+    final standalone = <num>[];
     for (final line in lines) {
       if (_looksLikeDate(line) || _isBundleOrThreshold(line)) continue;
       if (RegExp(
@@ -519,10 +900,12 @@ class CouponParser {
         continue;
       }
       final match = RegExp(
-        r'^(?:NT\$|NT|[$＄])?\s*([0-9][0-9,]*)\s*(?:元)?$',
+        r'^(?:NT\$|NT|[$＄])?\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:元)?$',
       ).firstMatch(line.trim());
       if (match != null) standalone.add(_amount(match.group(1))!);
-      final savingsMatch = RegExp(r'^-\s*([0-9][0-9,]*)$').firstMatch(line);
+      final savingsMatch = RegExp(
+        r'^-\s*([0-9][0-9,]*(?:\.[0-9]+)?)$',
+      ).firstMatch(line);
       if (savingsMatch != null)
         statedSavings ??= _amount(savingsMatch.group(1));
     }
@@ -549,6 +932,53 @@ class CouponParser {
       ambiguous: ambiguous,
       conflicting: conflicting,
       inferredStandalone: inferredStandalone,
+    );
+  }
+
+  _PriceSemantics _extractNativeSpatialPrices(
+    ProductRegion region,
+    _PriceSemantics fallback,
+  ) {
+    if (fallback.original != null && fallback.promotional != null) {
+      return fallback;
+    }
+    final positives = <({num value, double top})>[];
+    final discounts = <num>[];
+    for (final block in region.blocks) {
+      final text = block.line.text.trim();
+      final discountMatch = RegExp(
+        r'^-\s*([0-9][0-9,]*(?:\.[0-9]+)?)$',
+      ).firstMatch(text);
+      if (discountMatch != null) {
+        final value = _amount(discountMatch.group(1));
+        if (value != null) discounts.add(value);
+        continue;
+      }
+      if (_isBundleOrThreshold(text)) continue;
+      final priceMatch = RegExp(
+        r'^(?:NT\$|NT|[$＄])?\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:元)?$',
+        caseSensitive: false,
+      ).firstMatch(text);
+      final value = _amount(priceMatch?.group(1));
+      if (value != null && value > 0) {
+        positives.add((value: value, top: block.line.top));
+      }
+    }
+    if (positives.length != 2 || discounts.length != 1) return fallback;
+    positives.sort((a, b) => a.top.compareTo(b.top));
+    final original = positives.first.value;
+    final promotional = positives.last.value;
+    final savings = discounts.single;
+    if (original <= promotional || original - promotional != savings) {
+      return fallback;
+    }
+    return _PriceSemantics(
+      original: original,
+      promotional: promotional,
+      savings: savings,
+      ambiguous: false,
+      conflicting: false,
+      inferredStandalone: false,
     );
   }
 
@@ -708,19 +1138,27 @@ class CouponParser {
       ).hasMatch(value) ||
       RegExp(r'^(返回|首頁|搜尋|購物車|我的|分享|更多)$').hasMatch(value.trim());
   bool _looksLikePrice(String value) => RegExp(
-    r'^(?:原價|原售價|一般售價|定價|優惠價|特價|促銷價|賣場售價|會員價|現省|省下|折價|折抵|共省)?\s*[:：]?\s*(?:NT\$|NT|[$＄]|-)?\s*[0-9][0-9,]*(?:\s*元)?(?:\s*【?賣場售價】?)?$',
+    r'^(?:原價|原售價|一般售價|定價|優惠價|特價|促銷價|賣場售價|會員價|現省|省下|折價|折抵|共省)?\s*[:：]?\s*(?:NT\$|NT|[$＄]|-)?\s*[0-9][0-9,]*(?:\.[0-9]+)?(?:\s*元)?(?:\s*【?賣場售價】?)?$',
     caseSensitive: false,
   ).hasMatch(value.trim());
   bool _isBundleOrThreshold(String value) =>
       RegExp(r'任選|任\s*\d+|第[二2]件|滿\s*[0-9,]+|平均|每(?:件|組|入)|單價').hasMatch(value);
 
-  int? _amount(String? source) => source == null
+  num? _amount(String? source) => source == null
       ? null
-      : int.tryParse(source.replaceAll(',', '').replaceAll(' ', ''));
-  String _money(int value) => value.toString().replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (_) => ',',
-  );
+      : num.tryParse(source.replaceAll(',', '').replaceAll(' ', ''));
+  String _money(num value) {
+    final raw = value is double && value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toString();
+    final parts = raw.split('.');
+    final whole = parts.first.replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (_) => ',',
+    );
+    return parts.length == 1 ? whole : '$whole.${parts.last}';
+  }
+
   int _stateOrder(CandidateState value) => switch (value) {
     CandidateState.needsReview => 0,
     CandidateState.ready => 1,
@@ -758,9 +1196,9 @@ class _PriceSemantics {
     required this.inferredStandalone,
   });
 
-  final int? original;
-  final int? promotional;
-  final int? savings;
+  final num? original;
+  final num? promotional;
+  final num? savings;
   final bool ambiguous;
   final bool conflicting;
   final bool inferredStandalone;
@@ -771,4 +1209,14 @@ class _MergedCandidates {
 
   final List<CouponCandidate> values;
   final int mergedCount;
+}
+
+class _CanonicalCandidate {
+  const _CanonicalCandidate({
+    required this.candidate,
+    required this.contaminationCount,
+  });
+
+  final CouponCandidate candidate;
+  final int contaminationCount;
 }

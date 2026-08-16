@@ -25,6 +25,33 @@ class DocumentUnderstandingResult {
   final List<ProductRegion> regions;
   final List<ClassifiedOcrLine> sharedBlocks;
   final List<ClassifiedOcrLine> classifiedBlocks;
+
+  String toStructuredMarkdown({required int pageNumber, String merchant = ''}) {
+    final buffer = StringBuffer('# Page $pageNumber\n\n');
+    for (var index = 0; index < regions.length; index++) {
+      final region = regions[index];
+      buffer.writeln('## Product Cell ${index + 1}');
+      if (merchant.trim().isNotEmpty) buffer.writeln('Merchant: $merchant');
+      buffer.writeln('Region: ${region.id}');
+      for (final block in region.blocks) {
+        buffer.writeln(
+          '${block.type.name}: ${block.line.text.trim()} '
+          '[${block.line.left.toStringAsFixed(3)},'
+          '${block.line.top.toStringAsFixed(3)},'
+          '${block.line.right.toStringAsFixed(3)},'
+          '${block.line.bottom.toStringAsFixed(3)}]',
+        );
+      }
+      buffer.writeln();
+    }
+    if (sharedBlocks.isNotEmpty) {
+      buffer.writeln('## Shared Page Metadata');
+      for (final block in sharedBlocks) {
+        buffer.writeln('${block.type.name}: ${block.line.text.trim()}');
+      }
+    }
+    return buffer.toString();
+  }
 }
 
 class DocumentUnderstandingPipeline {
@@ -51,9 +78,23 @@ class DocumentUnderstandingPipeline {
     final assignable = classified
         .where((block) => !_isSharedPageBlock(block))
         .toList();
+    final costcoRegions =
+        page.extractionMethod == ImportExtractionMethod.nativePdfText &&
+            _looksLikeCostcoPage(classified)
+        ? _costcoGridRegions(page, assignable)
+        : const <ProductRegion>[];
+    if (costcoRegions.isNotEmpty) {
+      return DocumentUnderstandingResult(
+        regions: costcoRegions,
+        sharedBlocks: shared,
+        classifiedBlocks: classified,
+      );
+    }
     final anchors = _selectAnchors(
       assignable,
       allowWeakPriceAnchors: page.positionedLines.isNotEmpty,
+      allowProductNameAnchors:
+          page.extractionMethod == ImportExtractionMethod.nativePdfText,
     );
     final regions = anchors.length > 1
         ? _regionsFromAnchors(page, assignable, anchors)
@@ -133,6 +174,7 @@ class DocumentUnderstandingPipeline {
   List<ClassifiedOcrLine> _selectAnchors(
     List<ClassifiedOcrLine> blocks, {
     required bool allowWeakPriceAnchors,
+    required bool allowProductNameAnchors,
   }) {
     final items = blocks
         .where((block) => block.type == SemanticBlockType.itemNumber)
@@ -142,6 +184,13 @@ class DocumentUnderstandingPipeline {
         .where((block) => block.type == SemanticBlockType.promoPrice)
         .toList();
     if (promoPrices.isNotEmpty) return _deduplicateAnchors(promoPrices);
+    if (allowProductNameAnchors) {
+      final productNames = blocks
+          .where((block) => block.type == SemanticBlockType.productName)
+          .toList();
+      final anchors = _deduplicateAnchors(productNames, distance: 0.08);
+      if (anchors.length > 1) return anchors;
+    }
     if (!allowWeakPriceAnchors) return const [];
     final standalonePrices = blocks
         .where(
@@ -153,13 +202,16 @@ class DocumentUnderstandingPipeline {
     return _deduplicateAnchors(standalonePrices);
   }
 
-  List<ClassifiedOcrLine> _deduplicateAnchors(List<ClassifiedOcrLine> values) {
+  List<ClassifiedOcrLine> _deduplicateAnchors(
+    List<ClassifiedOcrLine> values, {
+    double distance = 0.045,
+  }) {
     final result = <ClassifiedOcrLine>[];
     for (final value in values) {
       final duplicate = result.any(
         (existing) =>
-            (existing.line.centerX - value.line.centerX).abs() < 0.045 &&
-            (existing.line.centerY - value.line.centerY).abs() < 0.045,
+            (existing.line.centerX - value.line.centerX).abs() < distance &&
+            (existing.line.centerY - value.line.centerY).abs() < distance,
       );
       if (!duplicate) result.add(value);
     }
@@ -225,6 +277,87 @@ class DocumentUnderstandingPipeline {
     }
     return regions;
   }
+
+  /// Costco native-text catalogs use four independent vertical columns.
+  /// Discount labels are stable cell-local anchors, while ITEM labels are not
+  /// present for every product. Grouping anchors independently per column
+  /// preserves ownership when columns contain different row counts.
+  List<ProductRegion> _costcoGridRegions(
+    OcrPageResult page,
+    List<ClassifiedOcrLine> blocks,
+  ) {
+    final discountAnchors = blocks
+        .where((block) => block.type == SemanticBlockType.discount)
+        .toList();
+    if (discountAnchors.length < 4) return const [];
+
+    final columns = List.generate(4, (_) => <List<ClassifiedOcrLine>>[]);
+    for (final anchor in discountAnchors) {
+      final column = (anchor.line.centerX.clamp(0.0, 0.999999) * 4).floor();
+      final groups = columns[column];
+      List<ClassifiedOcrLine>? matching;
+      for (final group in groups) {
+        if ((anchor.line.centerY - _averageY(group)).abs() < 0.055) {
+          matching = group;
+          break;
+        }
+      }
+      if (matching == null) {
+        groups.add([anchor]);
+      } else {
+        matching.add(anchor);
+      }
+    }
+
+    final regions = <ProductRegion>[];
+    for (var columnIndex = 0; columnIndex < columns.length; columnIndex++) {
+      final groups = columns[columnIndex]
+        ..sort((a, b) => _averageY(a).compareTo(_averageY(b)));
+      if (groups.isEmpty) continue;
+      for (var rowIndex = 0; rowIndex < groups.length; rowIndex++) {
+        final centerY = _averageY(groups[rowIndex]);
+        final previousY = rowIndex == 0 ? 0.0 : _averageY(groups[rowIndex - 1]);
+        final nextY = rowIndex == groups.length - 1
+            ? 1.0
+            : _averageY(groups[rowIndex + 1]);
+        final bounds = OcrRegionBounds(
+          left: columnIndex / 4,
+          top: rowIndex == 0 ? 0.0 : (previousY + centerY) / 2,
+          right: (columnIndex + 1) / 4,
+          bottom: rowIndex == groups.length - 1 ? 1.0 : (centerY + nextY) / 2,
+        );
+        final owned =
+            blocks
+                .where(
+                  (block) =>
+                      block.line.centerX >= bounds.left &&
+                      block.line.centerX < bounds.right &&
+                      block.line.centerY >= bounds.top &&
+                      block.line.centerY < bounds.bottom,
+                )
+                .toList()
+              ..sort((a, b) => a.readingOrder.compareTo(b.readingOrder));
+        if (owned.isEmpty) continue;
+        regions.add(
+          ProductRegion(
+            id: 'p${page.pageNumber ?? 0}-costco-c$columnIndex-r$rowIndex',
+            bounds: bounds,
+            blocks: owned,
+          ),
+        );
+      }
+    }
+    regions.sort((a, b) {
+      final vertical = a.bounds.top.compareTo(b.bounds.top);
+      return vertical == 0 ? a.bounds.left.compareTo(b.bounds.left) : vertical;
+    });
+    return regions;
+  }
+
+  bool _looksLikeCostcoPage(List<ClassifiedOcrLine> blocks) => blocks.any(
+    (block) =>
+        RegExp(r'Costco|好市多', caseSensitive: false).hasMatch(block.line.text),
+  );
 
   List<ProductRegion> _singleOrSeparatedRegions(
     OcrPageResult page,
@@ -293,15 +426,15 @@ class DocumentUnderstandingPipeline {
     caseSensitive: false,
   );
   static final RegExp _originalPrice = RegExp(
-    r'(?:原價|原售價|一般售價|定價)\s*[:：]?\s*(?:NT\$|NT|[$＄])?\s*[0-9][0-9,]*',
+    r'(?:原價|原售價|一般售價|定價)\s*[:：]?\s*(?:NT\$|NT|[$＄])?\s*[0-9][0-9,]*(?:\.[0-9]+)?',
     caseSensitive: false,
   );
   static final RegExp _promoPrice = RegExp(
-    r'(?:優惠價|特價|促銷價|賣場售價|會員價)\s*[:：]?\s*(?:NT\$|NT|[$＄])?\s*[0-9][0-9,]*',
+    r'(?:優惠價|特價|促銷價|賣場售價|會員價)\s*[:：]?\s*(?:NT\$|NT|[$＄])?\s*[0-9][0-9,]*(?:\.[0-9]+)?',
     caseSensitive: false,
   );
   static final RegExp _discount = RegExp(
-    r'(?:現省|省下|折價|折抵|共省)\s*[:：]?\s*[0-9][0-9,]*|^-\s*[0-9][0-9,]*$',
+    r'(?:現省|省下|折價|折抵|共省)\s*[:：]?\s*[0-9][0-9,]*(?:\.[0-9]+)?|^-\s*[0-9][0-9,]*(?:\.[0-9]+)?$',
   );
   static final RegExp _specificationOnly = RegExp(
     r'^\s*\d+(?:\.\d+)?\s*(?:(?:包|瓶|罐|個|袋|盒|組)入?|入|g|kg|ml|l|公升|吋|GB|TB)(?:\s*\([A-Z]{2,4}\))?\s*$',
@@ -312,7 +445,7 @@ class DocumentUnderstandingPipeline {
   );
   static final RegExp _brand = RegExp(r'^品牌[:：]\s*.+$');
   static final RegExp _standalonePrice = RegExp(
-    r'^(?:NT\$|NT|[$＄])?\s*[0-9][0-9,]*\s*(?:元)?$',
+    r'^(?:NT\$|NT|[$＄])?\s*[0-9][0-9,]*(?:\.[0-9]+)?\s*(?:元)?$',
     caseSensitive: false,
   );
 }

@@ -9,6 +9,14 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
 
 manifest_path = Path("android/app/src/main/AndroidManifest.xml")
 manifest = manifest_path.read_text(encoding="utf-8")
+if "android.permission.INTERNET" not in manifest:
+    manifest = replace_once(
+        manifest,
+        "<application",
+        '<uses-permission android:name="android.permission.INTERNET"/>\n'
+        "    <application",
+        "manifest application tag for network permission",
+    )
 if "android.permission.RECEIVE_BOOT_COMPLETED" not in manifest:
     manifest = replace_once(
         manifest,

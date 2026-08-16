@@ -1,5 +1,27 @@
 # Parser Limits and Known Issues
 
+## V0.16R known limitations
+
+- Production cloud vision is disabled until a provider/proxy and complete privacy
+  disclosure are configured. The standard APK therefore uses local fallback for
+  promotional images and scanned pages.
+- The FamilyMart original selected image is not present; only Founder failure
+  evidence/thumbnail remains. Product-count regression is labelled, but full
+  identity/field accuracy cannot be scored until the original is supplied again.
+- Native PDF product-cell reconstruction is deterministic and layout-aware, but
+  unusual overlapping/vector text, encrypted PDFs or missing fonts may require the
+  scanned-page path.
+- Multi-variant cards (several sizes/models/prices in one visual cell) remain one
+  product object and may require confirmation rather than being split or guessed.
+- No production accuracy number is claimed before Founder Android Golden Dataset
+  reruns. Automated schema/fixture tests are engineering evidence only.
+- The public repository stores Golden Dataset manifests/hashes, not copyrighted
+  retailer binary assets.
+- This Linux runner cannot execute the real native-PDF path under `flutter test`
+  because PDFium is not bundled into that test process, and it has no Android SDK.
+  CI APK build and Founder Android execution are therefore the authoritative native
+  PDF runtime evidence.
+
 ## V0.16 known limitations
 
 - Device OCR still determines which characters are available; severely blurred or missing text cannot be recovered.

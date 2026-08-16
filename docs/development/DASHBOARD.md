@@ -1,19 +1,19 @@
 # Project Clover Development Dashboard
 
-_Last updated: 2026-08-12_
+_Last updated: 2026-08-16_
 
 ## Executive Status
 
-- Current version: V0.16 — Import Accuracy & Reconstruction
-- Current state: FOUNDER_TEST
+- Current version: V0.16R / 0.16.1 — Import Architecture Remediation
+- Current state: READY_TO_PUSH
 - Development branch: `agent/flutter-prototype-v0`
 - Draft PR: #1 (Open, Draft, not merged)
 - CI evidence head: `276ec73fa145d758608bf1c6b70700d0aa8f50cc`
-- V0.16 implementation: integrated into remote branch
-- CI: GitHub Actions run #89 passed
-- CI verification: format passed, analyze passed, 103 tests passed
-- Android artifact: Build 16 debug APK uploaded as `project-clover-android-debug`
-- Founder Acceptance: pending real-device Costco PDF and multi-product image validation
+- V0.16 Founder Acceptance: FAILED — real images had severe false negatives and
+  Costco fields remained polluted/mixed.
+- V0.16R privacy architecture: Hybrid Local-first approved 2026-08-16.
+- V0.16R CI/build: pending; V0.16 run #89 remains historical evidence only.
+- Founder Acceptance: pending V0.16R Costco/PX Mart/FamilyMart rerun.
 
 ## Product Progress
 
@@ -30,16 +30,18 @@ _Last updated: 2026-08-12_
 - JSON backup / restore and backward compatibility
 - Diagnostics / feedback / cleanup / global reminder defaults
 
-### Universal Import — ACTIVE
+### Universal Import — REMEDIATION ACTIVE
 - Image import
 - Multi-product import architecture
 - PDF catalogue import
-- Local OCR
+- Native PDF text/layout first
+- Explicit-consent multimodal vision for images/scanned pages
+- Conservative local OCR fallback
 - Product reconstruction
 - Merchant / brand / product field separation
 - READY / NEEDS REVIEW / REJECTED states
 - Final Validation Gate
-- V0.16 focus: prevent non-product candidates, prevent cross-cell contamination, reduce review burden
+- V0.16R focus: balanced real-world recall/precision with evidence ownership
 
 ### Beta / Release Readiness — PARTIAL
 - Founder real-device validation: ongoing
@@ -59,18 +61,19 @@ _Last updated: 2026-08-12_
 | G0 | Approved scope/spec | PASS |
 | G1 | Repo/worktree inspection | PASS |
 | G2 | Implementation | PASS |
-| G3 | Local QA | PASS (102/102 baseline before final gate follow-up; formatter and diff checks passed afterward) |
-| G4 | Commit / integration | PASS |
+| G3 | Local QA | PASS — analyze clean, 120 tests |
+| G4 | Commit / integration | READY TO PUSH |
 | G5 | Release authorization | PASS |
-| G6 | GitHub CI + Android APK | PASS — run #89, 103 tests, Build 16 artifact |
-| G7 | Founder Android Acceptance | WAITING |
+| G6 | GitHub CI + Android APK | PENDING (local runner has no Android SDK) |
+| G7 | Founder Android Acceptance | BLOCKED UNTIL G6 |
 | G8 | Accepted / Release-ready | NOT STARTED |
 
 ## Current Acceptance Work
 
-The run #87 analyze failure was fixed by importing the enum used by the final-validation regression test. Run #89 subsequently passed format, analyze, all 103 tests, Android Build 16, and artifact upload.
-
-No automated P0 regression is currently known. G7 still requires the Founder to install Build 16 and re-test the representative supermarket screenshot and Costco PDF. Record labelled precision, recall, field accuracy, duplicate rate, cross-cell contamination, and review burden; do not infer production accuracy from synthetic fixtures.
+V0.16 run #89 passed engineering checks but failed Founder Acceptance. The
+remediation replaces raster-OCR PDF extraction and universal text-fragment grouping
+with source routing, native PDF layout and consented product-region vision. Green
+synthetic tests must not be represented as real-world performance.
 
 ## Google Play Launch Roadmap
 

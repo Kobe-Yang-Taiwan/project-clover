@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:project_clover/import/coupon_import_models.dart';
 import 'package:project_clover/import/coupon_parser.dart';
+import 'package:project_clover/import/document_understanding.dart';
 import 'package:project_clover/models/offer.dart';
 
 void main() {
@@ -188,6 +189,113 @@ void main() {
     expect(candidate.expirationDate, isNull);
     expect(candidate.state, CandidateState.needsReview);
     expect(candidate.selected, isFalse);
+  });
+
+  test(
+    'native Costco price stack preserves original discount and sale roles',
+    () {
+      final lines = [
+        line('Costco 好市多 優惠期間 2026/04/13-2026/05/10', 0.02, 0.01, width: 0.96),
+        line('TP-LINK DECO X55 雙頻路由器', 0.05, 0.12),
+        line('ITEM 142138', 0.05, 0.20, width: 0.18),
+        line('3,549', 0.10, 0.28, width: 0.12),
+        line('-710', 0.10, 0.33, width: 0.12),
+        line(r'$2,839', 0.10, 0.38, width: 0.12),
+        line('【賣場售價】', 0.08, 0.43, width: 0.18),
+      ];
+      final source = OcrPageResult(
+        sourceType: ImportSourceType.pdf,
+        pageNumber: 2,
+        text: lines.map((value) => value.text).join('\n'),
+        lines: lines.map((value) => value.text).toList(),
+        positionedLines: lines,
+        succeeded: true,
+        duration: Duration.zero,
+        extractionMethod: ImportExtractionMethod.nativePdfText,
+      );
+
+      final candidate = parser.parsePagesDetailed([source]).candidates.single;
+
+      expect(candidate.originalPrice, 3549);
+      expect(candidate.promotionalPrice, 2839);
+      expect(candidate.savings, 710);
+      expect(
+        candidate.fieldEvidence['product_name']?.regionId,
+        candidate.sourceRegionId,
+      );
+      expect(
+        candidate.fieldEvidence['promo_price']?.regionId,
+        candidate.sourceRegionId,
+      );
+      expect(candidate.fieldEvidence['valid_until']?.regionId, 'p2-shared');
+    },
+  );
+
+  test('native Costco columns preserve asymmetric product-cell ownership', () {
+    const pipeline = DocumentUnderstandingPipeline();
+    final lines = <OcrTextLine>[
+      line('Costco 好市多 優惠期間 2026/04/13-2026/05/10', 0.02, 0.01, width: 0.96),
+      for (var column = 0; column < 4; column++) ...[
+        line('C$column TOP PRODUCT', column * 0.25 + 0.02, 0.12, width: 0.20),
+        line('-100', column * 0.25 + 0.08, 0.25, width: 0.08),
+        if (column == 2) line('-120', column * 0.25 + 0.15, 0.27, width: 0.06),
+      ],
+      for (final column in [0, 2, 3]) ...[
+        line(
+          'C$column BOTTOM PRODUCT',
+          column * 0.25 + 0.02,
+          0.58,
+          width: 0.20,
+        ),
+        line('-200', column * 0.25 + 0.08, 0.70, width: 0.08),
+      ],
+    ];
+    final source = OcrPageResult(
+      sourceType: ImportSourceType.pdf,
+      pageNumber: 6,
+      text: lines.map((value) => value.text).join('\n'),
+      lines: lines.map((value) => value.text).toList(),
+      positionedLines: lines,
+      succeeded: true,
+      duration: Duration.zero,
+      extractionMethod: ImportExtractionMethod.nativePdfText,
+    );
+
+    final result = pipeline.understand(source);
+
+    expect(result.regions, hasLength(7));
+    expect(
+      result.regions.every((region) {
+        final columnNames = region.lines
+            .where((value) => value.contains('PRODUCT'))
+            .map((value) => value.substring(0, 2))
+            .toSet();
+        return columnNames.length <= 1;
+      }),
+      isTrue,
+    );
+  });
+
+  test('layout-aware structured markdown preserves product-cell ownership', () {
+    const pipeline = DocumentUnderstandingPipeline();
+    final source = positionedPage([
+      line('Costco 好市多 優惠期間 2026/08/01-2026/08/31', 0.05, 0.01, width: 0.9),
+      line('商品 A', 0.05, 0.12),
+      line('ITEM 111111', 0.08, 0.28, width: 0.18),
+      line('優惠價 199', 0.08, 0.34, width: 0.18),
+      line('商品 B', 0.55, 0.12),
+      line('ITEM 222222', 0.58, 0.28, width: 0.18),
+      line('優惠價 299', 0.58, 0.34, width: 0.18),
+    ]);
+
+    final markdown = pipeline
+        .understand(source)
+        .toStructuredMarkdown(pageNumber: 2, merchant: 'Costco 好市多');
+
+    expect(markdown, contains('## Product Cell 1'));
+    expect(markdown, contains('## Product Cell 2'));
+    expect(markdown, contains('itemNumber: ITEM 111111'));
+    expect(markdown, contains('itemNumber: ITEM 222222'));
   });
 
   test('labeled quality metrics expose precision recall and review burden', () {

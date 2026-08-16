@@ -80,6 +80,90 @@ void main() {
     expect(find.text('今天值得使用'), findsOneWidget);
   });
 
+  testWidgets('cloud vision waits for explicit per-import consent', (
+    tester,
+  ) async {
+    final service = ConsentImportService();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageImportScreen(
+          path: '/fixture/promo.png',
+          service: service,
+          store: OfferStore(initialOffers: []),
+          reminders: RecordingReminderScheduler(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('是否使用雲端視覺辨識？'), findsOneWidget);
+    expect(service.analyzeCalls, 0);
+
+    await tester.tap(find.byKey(const Key('decline-cloud-processing')));
+    await tester.pumpAndSettle();
+
+    expect(service.analyzeCalls, 1);
+    expect(service.lastAllowCloudProcessing, isFalse);
+  });
+
+  testWidgets('structured cloud products survive failed local OCR evidence', (
+    tester,
+  ) async {
+    const cloudEvidence = FieldEvidence(
+      sourceType: ImportSourceType.image,
+      extractionMethod: ImportExtractionMethod.cloudVision,
+      sourcePage: null,
+      regionId: 'card-1',
+      rawText: '全聯福利中心 測試牛乳 119元 2026/08/31',
+      confidence: 0.98,
+    );
+    final service = ConsentImportService(
+      products: [
+        ReconstructedProduct(
+          regionId: 'card-1',
+          sourceType: ImportSourceType.image,
+          sourcePage: null,
+          merchant: const EvidencedValue(
+            value: '全聯福利中心',
+            evidence: cloudEvidence,
+          ),
+          productName: const EvidencedValue(
+            value: '測試牛乳',
+            evidence: cloudEvidence,
+          ),
+          promotionalPrice: const EvidencedValue(
+            value: 119,
+            evidence: cloudEvidence,
+          ),
+          validUntil: EvidencedValue(
+            value: DateTime(2026, 8, 31),
+            evidence: cloudEvidence,
+          ),
+          regionEvidence: cloudEvidence,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageImportScreen(
+          path: '/fixture/promo.png',
+          service: service,
+          store: OfferStore(initialOffers: []),
+          reminders: RecordingReminderScheduler(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const Key('accept-cloud-processing')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('選擇要匯入的優惠'), findsOneWidget);
+    expect(find.text('測試牛乳'), findsOneWidget);
+    expect(service.lastAllowCloudProcessing, isTrue);
+  });
+
   testWidgets('confirmed candidate creates exactly one coupon', (tester) async {
     final store = OfferStore(initialOffers: []);
     final reminders = RecordingReminderScheduler();
@@ -692,6 +776,77 @@ class FakeDiagnosticExportService implements DiagnosticExportService {
 }
 
 class CancelledImportService implements CouponImportService {
+  @override
+  Future<String?> pickImage() async => null;
+
+  @override
+  Future<String?> pickPdf() async => null;
+
+  @override
+  Future<OcrPageResult> recognizeImage(String path) =>
+      throw UnimplementedError();
+
+  @override
+  Future<List<OcrPageResult>> recognizePdf(
+    String path, {
+    required void Function(ImportProgress progress) onProgress,
+    required bool Function() isCancelled,
+  }) => throw UnimplementedError();
+}
+
+class ConsentImportService
+    implements CouponImportService, SourceAdaptiveCouponImportService {
+  ConsentImportService({this.products = const []});
+
+  final List<ReconstructedProduct> products;
+  int analyzeCalls = 0;
+  bool? lastAllowCloudProcessing;
+
+  @override
+  bool get cloudVisionAvailable => true;
+
+  @override
+  String get cloudVisionDisclosure => '測試供應商；資料不作訓練，最多保留 30 天後刪除。';
+
+  @override
+  Future<SourceAdaptiveImportResult> analyzeImage(
+    String path, {
+    required bool allowCloudProcessing,
+  }) async {
+    analyzeCalls++;
+    lastAllowCloudProcessing = allowCloudProcessing;
+    return SourceAdaptiveImportResult(
+      route: ImportRoute.promotionalImage,
+      pages: const [
+        OcrPageResult(
+          sourceType: ImportSourceType.image,
+          pageNumber: null,
+          text: '',
+          lines: [],
+          succeeded: false,
+          duration: Duration.zero,
+        ),
+      ],
+      products: products,
+      cloudUsage: allowCloudProcessing
+          ? const CloudProcessingUsage(requestCount: 1)
+          : const CloudProcessingUsage(),
+      cloudWasDeclined: !allowCloudProcessing,
+      localFallbackUsed: !allowCloudProcessing,
+    );
+  }
+
+  @override
+  Future<SourceAdaptiveImportResult> analyzePdf(
+    String path, {
+    required bool allowCloudProcessing,
+    required void Function(ImportProgress progress) onProgress,
+    required bool Function() isCancelled,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<PdfSourcePlan> inspectPdf(String path) => throw UnimplementedError();
+
   @override
   Future<String?> pickImage() async => null;
 

@@ -1,5 +1,10 @@
 # V0.16 Founder Acceptance Checklist
 
+Final result: **FAILED**. Historical Build 16 engineering evidence below remains
+valid, but Founder real-device Costco and multi-product image results did not meet
+the product gate. Remediation continues as V0.16R / 0.16.1; do not relabel V0.16
+as accepted.
+
 Test version: `0.16.0 (Build 16)`
 
 ## Engineering gate evidence

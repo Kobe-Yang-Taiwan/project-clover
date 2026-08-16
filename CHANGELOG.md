@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.1+17 — Source-Adaptive Import Remediation
+
+- Native-text PDF 改以本機文字、座標與 product-cell ownership 重建，不再優先整頁 OCR。
+- 圖片與掃描頁新增逐次同意、可關閉且 provider-neutral 的多模態視覺路徑。
+- 每個 canonical 欄位保留 evidence/provenance；跨 region 欄位直接排除並計數。
+- Costco 四欄版面、價格堆疊與不等列數分區避免漏件及跨 cell 污染。
+- 新增真實 Costco／全聯／全家 Golden Dataset ground truth、hash 與必要品質指標。
+- Cloud output 仍須通過 deterministic validation、confidence 與 review，不能直接寫入資料庫。
+
 ## 0.16.0+16 — Import Accuracy & Reconstruction
 
 - 圖片與 PDF 共用 Extract → Segment → Classify → Associate → Reconstruct → Validate 管線。

@@ -1,0 +1,57 @@
+# V0.16R / 0.16.1 Founder Android Acceptance Checklist
+
+Test build: `0.16.1 (Build 17)`
+State: NOT READY — CI/APK and Founder real-device metrics pending
+
+## Privacy and routing
+
+- [ ] Native Costco PDF reports local native-text route and zero cloud requests.
+- [ ] Image/scanned-page upload occurs only after tapping `同意本次傳送`.
+- [ ] `只用本機` causes zero upload and keeps manual/local fallback available.
+- [ ] Only selected image/required scanned pages are transmitted.
+- [ ] Cloud failure does not change existing coupons or reminders.
+
+## Costco (129 product cards)
+
+- [ ] Page counts match 16／16／16／20／13／16／16／16.
+- [ ] Page 1 legal content creates zero candidates.
+- [ ] Package/spec/ITEM/price/disclaimer fragments never become product names.
+- [ ] Each visual cell is one product object; multi-variant cells are not duplicated.
+- [ ] No name/brand/model/spec/ITEM/price crosses to a neighboring cell.
+- [ ] Original, discount and sale price roles match visible evidence or stay unknown.
+
+## PX Mart (12 product cards)
+
+- [ ] Detects 12 distinct products.
+- [ ] Payment campaign banners and app/status/navigation UI are excluded.
+- [ ] Bundle totals, quantities and average unit prices retain different roles.
+- [ ] Merchant is 全聯福利中心; every price/spec remains with its own card.
+
+## FamilyMart (8 product cards)
+
+- [ ] Original source image is supplied again and its SHA-256 is recorded.
+- [ ] Detects 8 distinct products rather than the V0.16 baseline of 1.
+- [ ] Shared campaign text and phone UI create zero products.
+- [ ] Eight visible prices remain associated with their own product regions.
+
+## Record for every sample
+
+- Ground Truth Product Count
+- Detected Product Count
+- Correct Product Count
+- Product Recall
+- Candidate Precision
+- Field Accuracy
+- False Candidate Count
+- Duplicate Rate
+- Cross-product Contamination
+- Review Burden
+- Cloud requests and estimated cost
+
+## Engineering regression
+
+- [x] Format, analyze and all Flutter tests pass (120 tests, 2026-08-16).
+- [ ] Android debug APK builds and installs.
+- [ ] Manual entry, storage, backup/restore, reminder and earlier import flows pass.
+
+Do not mark accepted if any P0 item fails. Do not merge `main`.

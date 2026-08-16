@@ -2,6 +2,15 @@ import '../models/offer.dart';
 
 enum ImportSourceType { image, pdf }
 
+enum ImportExtractionMethod {
+  localOcr,
+  nativePdfText,
+  cloudVision,
+  canonicalFixture,
+}
+
+enum ImportRoute { nativeTextPdf, scannedPdf, promotionalImage }
+
 enum ImportConfidence { high, medium, low }
 
 enum CandidateState { ready, needsReview, rejected }
@@ -88,6 +97,8 @@ class OcrPageResult {
     required this.duration,
     this.failureCode,
     this.positionedLines = const [],
+    this.extractionMethod = ImportExtractionMethod.localOcr,
+    this.structuredRepresentation = '',
   });
 
   final ImportSourceType sourceType;
@@ -98,6 +109,162 @@ class OcrPageResult {
   final Duration duration;
   final String? failureCode;
   final List<OcrTextLine> positionedLines;
+  final ImportExtractionMethod extractionMethod;
+  final String structuredRepresentation;
+}
+
+class FieldEvidence {
+  const FieldEvidence({
+    required this.sourceType,
+    required this.extractionMethod,
+    required this.sourcePage,
+    required this.regionId,
+    required this.rawText,
+    required this.confidence,
+    this.bounds,
+  });
+
+  final ImportSourceType sourceType;
+  final ImportExtractionMethod extractionMethod;
+  final int? sourcePage;
+  final String regionId;
+  final String rawText;
+  final double confidence;
+  final OcrRegionBounds? bounds;
+
+  bool get isUsable =>
+      rawText.trim().isNotEmpty &&
+      regionId.trim().isNotEmpty &&
+      confidence >= 0 &&
+      confidence <= 1;
+}
+
+class EvidencedValue<T> {
+  const EvidencedValue({required this.value, required this.evidence});
+
+  final T value;
+  final FieldEvidence evidence;
+}
+
+class ReconstructedProduct {
+  const ReconstructedProduct({
+    required this.regionId,
+    required this.sourceType,
+    required this.sourcePage,
+    required this.productName,
+    this.merchant,
+    this.brand,
+    this.model,
+    this.specification,
+    this.itemNumber,
+    this.validFrom,
+    this.validUntil,
+    this.originalPrice,
+    this.promotionalPrice,
+    this.discountAmount,
+    this.promotionCondition,
+    this.category,
+    this.notes,
+    this.regionEvidence,
+  });
+
+  final String regionId;
+  final ImportSourceType sourceType;
+  final int? sourcePage;
+  final EvidencedValue<String>? merchant;
+  final EvidencedValue<String>? brand;
+  final EvidencedValue<String> productName;
+  final EvidencedValue<String>? model;
+  final EvidencedValue<String>? specification;
+  final EvidencedValue<String>? itemNumber;
+  final EvidencedValue<DateTime>? validFrom;
+  final EvidencedValue<DateTime>? validUntil;
+  final EvidencedValue<num>? originalPrice;
+  final EvidencedValue<num>? promotionalPrice;
+  final EvidencedValue<num>? discountAmount;
+  final EvidencedValue<String>? promotionCondition;
+  final EvidencedValue<String>? category;
+  final EvidencedValue<String>? notes;
+  final FieldEvidence? regionEvidence;
+
+  Iterable<FieldEvidence> get allEvidence sync* {
+    if (regionEvidence != null) yield regionEvidence!;
+    for (final value in <EvidencedValue<Object>?>[
+      merchant,
+      brand,
+      productName,
+      model,
+      specification,
+      itemNumber,
+      validFrom,
+      validUntil,
+      originalPrice,
+      promotionalPrice,
+      discountAmount,
+      promotionCondition,
+      category,
+      notes,
+    ]) {
+      if (value != null) yield value.evidence;
+    }
+  }
+}
+
+class CloudProcessingUsage {
+  const CloudProcessingUsage({
+    this.provider = '',
+    this.requestCount = 0,
+    this.transmittedBytes = 0,
+    this.estimatedCostUsd = 0,
+    this.failureCount = 0,
+  });
+
+  final String provider;
+  final int requestCount;
+  final int transmittedBytes;
+  final double estimatedCostUsd;
+  final int failureCount;
+
+  CloudProcessingUsage operator +(CloudProcessingUsage other) =>
+      CloudProcessingUsage(
+        provider: provider.isNotEmpty ? provider : other.provider,
+        requestCount: requestCount + other.requestCount,
+        transmittedBytes: transmittedBytes + other.transmittedBytes,
+        estimatedCostUsd: estimatedCostUsd + other.estimatedCostUsd,
+        failureCount: failureCount + other.failureCount,
+      );
+}
+
+class SourceAdaptiveImportResult {
+  const SourceAdaptiveImportResult({
+    required this.route,
+    required this.pages,
+    required this.products,
+    this.cloudUsage = const CloudProcessingUsage(),
+    this.cloudWasDeclined = false,
+    this.localFallbackUsed = false,
+  });
+
+  final ImportRoute route;
+  final List<OcrPageResult> pages;
+  final List<ReconstructedProduct> products;
+  final CloudProcessingUsage cloudUsage;
+  final bool cloudWasDeclined;
+  final bool localFallbackUsed;
+}
+
+class PdfSourcePlan {
+  const PdfSourcePlan({
+    required this.pageCount,
+    required this.nativeTextPages,
+    required this.visionPages,
+  });
+
+  final int pageCount;
+  final List<int> nativeTextPages;
+  final List<int> visionPages;
+
+  bool get requiresVision => visionPages.isNotEmpty;
 }
 
 class DateInference {
@@ -144,6 +311,7 @@ class CouponCandidate {
     this.isBatchDuplicate = false,
     this.isExistingDuplicate = false,
     this.sourceRegionId = '',
+    this.fieldEvidence = const {},
   }) : selected = selected ?? state == CandidateState.ready;
 
   final String id;
@@ -157,9 +325,9 @@ class CouponCandidate {
   final DateTime? expirationDate;
   final String offerDescription;
   final String valueText;
-  final int? originalPrice;
-  final int? promotionalPrice;
-  final int? savings;
+  final num? originalPrice;
+  final num? promotionalPrice;
+  final num? savings;
   final List<String> promotionConditions;
   final OfferCategory category;
   final int? sourcePage;
@@ -172,12 +340,13 @@ class CouponCandidate {
   final bool isBatchDuplicate;
   final bool isExistingDuplicate;
   final String sourceRegionId;
+  final Map<String, FieldEvidence> fieldEvidence;
 
   String get productName => title;
   DateTime? get validFrom => startDate;
   DateTime? get validUntil => expirationDate;
-  int? get promoPrice => promotionalPrice;
-  int? get discountAmount => savings;
+  num? get promoPrice => promotionalPrice;
+  num? get discountAmount => savings;
   List<String> get promotionCondition => promotionConditions;
   String get notes => offerDescription;
   List<String> get validationIssues => attentionFields;
@@ -222,9 +391,9 @@ class CouponCandidate {
     DateTime? expirationDate,
     String? offerDescription,
     String? valueText,
-    int? originalPrice,
-    int? promotionalPrice,
-    int? savings,
+    num? originalPrice,
+    num? promotionalPrice,
+    num? savings,
     List<String>? promotionConditions,
     OfferCategory? category,
     ImportConfidence? confidence,
@@ -235,6 +404,7 @@ class CouponCandidate {
     bool? isBatchDuplicate,
     bool? isExistingDuplicate,
     String? sourceRegionId,
+    Map<String, FieldEvidence>? fieldEvidence,
     String? rawText,
     bool clearOriginalPrice = false,
     bool clearPromotionalPrice = false,
@@ -271,6 +441,7 @@ class CouponCandidate {
       isBatchDuplicate: isBatchDuplicate ?? this.isBatchDuplicate,
       isExistingDuplicate: isExistingDuplicate ?? this.isExistingDuplicate,
       sourceRegionId: sourceRegionId ?? this.sourceRegionId,
+      fieldEvidence: fieldEvidence ?? this.fieldEvidence,
     );
   }
 }
@@ -292,6 +463,7 @@ class ImportQualityReport {
     this.missedProductCount,
     this.duplicateCandidateCount = 0,
     this.crossCellContaminationCount = 0,
+    this.cloudUsage = const CloudProcessingUsage(),
   });
 
   final int rawDetectedRegions;
@@ -309,12 +481,31 @@ class ImportQualityReport {
   final int? missedProductCount;
   final int duplicateCandidateCount;
   final int crossCellContaminationCount;
+  final CloudProcessingUsage cloudUsage;
 
   int get generatedCandidateCount => finalVisibleCandidateCount;
   double get reviewBurden =>
       actualProductCount == null || actualProductCount == 0
       ? finalVisibleCandidateCount.toDouble()
       : finalVisibleCandidateCount / actualProductCount!;
+
+  Map<String, Object?> toJson() => {
+    'raw_detected_regions': rawDetectedRegions,
+    'generated_candidate_count': generatedCandidateCount,
+    'direct_import_count': readyCount,
+    'needs_confirmation_count': needsReviewCount,
+    'excluded_count': rejectedCount,
+    'false_candidate_count': falseCandidateCount,
+    'missed_product_count': missedProductCount,
+    'duplicate_candidate_count': duplicateCandidateCount,
+    'cross_product_contamination_count': crossCellContaminationCount,
+    'review_burden': reviewBurden,
+    'processing_milliseconds': processingDuration.inMilliseconds,
+    'cloud_requests_used': cloudUsage.requestCount,
+    'cloud_transmitted_bytes': cloudUsage.transmittedBytes,
+    'cloud_estimated_cost_usd': cloudUsage.estimatedCostUsd,
+    'cloud_failure_count': cloudUsage.failureCount,
+  };
 }
 
 class CouponParseResult {
@@ -372,6 +563,23 @@ class LabeledImportQualityMetrics {
   double get reviewBurden => actualProductCount == 0
       ? generatedCandidateCount.toDouble()
       : generatedCandidateCount / actualProductCount;
+
+  Map<String, Object> toJson() => {
+    'actual_product_count': actualProductCount,
+    'generated_candidate_count': generatedCandidateCount,
+    'correct_product_count': matchedProductCount,
+    'product_recall': candidateRecall,
+    'candidate_precision': candidatePrecision,
+    'field_accuracy': fieldAccuracy,
+    'false_candidate_count': falseCandidateCount,
+    'missed_product_count': missedProductCount,
+    'duplicate_rate': duplicateRate,
+    'cross_product_contamination_count': crossCellContaminationCount,
+    'review_burden': reviewBurden,
+    'direct_import_count': directImportCount,
+    'needs_confirmation_count': needsConfirmationCount,
+    'excluded_count': excludedCount,
+  };
 }
 
 class ImportProgress {

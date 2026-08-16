@@ -1,0 +1,46 @@
+{
+  "sample_id": "pxmart-2026-08-multi-product-screenshot",
+  "source_type": "promotional_image",
+  "merchant": "全聯福利中心",
+  "asset_sha256": "c04da3c30f5e09772e4720310af32adcd827b0cbacc91be08aa9f0e8bbba2bad",
+  "asset_redistributable": false,
+  "ground_truth_product_count": 12,
+  "expected_valid_from": "2026-08-07",
+  "expected_valid_until": "2026-08-13",
+  "products": [
+    {"region": "banner-1-r1c1", "identity": "得意的一天 五珍寶健康調合油 3L", "promo_price": 289},
+    {"region": "banner-1-r1c2", "identity": "味味A 排骨雞／香辣牛肉袋麵", "promo_price": 72},
+    {"region": "banner-1-r1c3", "identity": "綠巨人 天然特甜玉米粒 340g 3入組", "promotion_total": 295, "condition": "2組", "unit_average": 147.5},
+    {"region": "banner-1-r2c1", "identity": "可樂果 鹹酥雞／酷辣口味", "promo_price": 88},
+    {"region": "banner-1-r2c2", "identity": "旺旺 仙貝", "promotion_total": 85, "condition": "任2包", "unit_average": 42.5},
+    {"region": "banner-1-r2c3", "identity": "楓康 實惠高品質鮮膜", "promo_price": 139},
+    {"region": "banner-2-r1c1", "identity": "舒跑 運動飲料 250ml 6入組", "promotion_total": 159, "condition": "4組", "unit_average": 39.8},
+    {"region": "banner-2-r1c2", "identity": "福樂 牛乳系列 200ml 6入組", "promotion_total": 239, "condition": "任4組", "unit_average": 59.8},
+    {"region": "banner-2-r1c3", "identity": "77 新貴派 巧克力／花生口味", "promotion_total": 79, "condition": "任2包", "unit_average": 39.5},
+    {"region": "banner-2-r2c1", "identity": "中興米 東部米／壽司米 4kg", "promo_price": 169},
+    {"region": "banner-2-r2c2", "identity": "養樂多 100cc 10入組", "promo_price": 69},
+    {"region": "banner-2-r2c3", "identity": "康寶 鮮味炒手 原味／全素風味 500g", "promo_price": 129}
+  ],
+  "non_product_regions": [
+    "mobile status bar",
+    "全聯福利中心 app header and navigation",
+    "中元感恩月 payment campaign banners",
+    "PX Pay spend threshold and reward points",
+    "page navigation and bottom app chrome"
+  ],
+  "maximum_cloud_requests": 1,
+  "acceptance_measurement": {
+    "status": "pending_configured_provider_and_founder_android",
+    "detected_product_count": null,
+    "correct_product_count": null,
+    "product_recall": null,
+    "candidate_precision": null,
+    "field_accuracy": null,
+    "false_candidate_count": null,
+    "duplicate_rate": null,
+    "cross_product_contamination": null,
+    "review_burden": null,
+    "cloud_requests_used": null,
+    "estimated_processing_cost_usd": null
+  }
+}

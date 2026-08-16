@@ -1,0 +1,31 @@
+# Project Clover V0.16R / 0.16.1 Release Notes
+
+Status: engineering remediation; not Founder accepted.
+
+## Import behavior changed
+
+- Native-text PDFs are parsed locally with layout and bounding boxes instead of
+  being OCRed as page images.
+- Promotional images and image-only PDF pages can use explicitly consented cloud
+  product-region vision through a replaceable provider contract.
+- Cloud processing is off unless a secure endpoint and privacy disclosure are
+  configured; no provider key is embedded in the APK.
+- Each cloud field must include visible evidence from the same product region.
+- Cross-product evidence rejects the candidate instead of silently mixing fields.
+- Native Costco price stacks preserve original／discount／sale relationships when
+  the arithmetic and spatial order agree.
+- Decimal values are supported; average/unit prices remain distinct from promotion
+  totals and conditions.
+- Review shows whether cloud or local fallback was used and reports request/byte/
+  estimated-cost information.
+
+## Safety
+
+Existing manual entry, local storage, reminder, backup/restore and atomic final
+validation remain the persistence path. Cloud output is never directly saved.
+
+## Acceptance
+
+Local format, analysis and 120 Flutter tests pass. Local Android build is blocked
+by the runner's missing Android SDK; GitHub Actions CI/APK is pending. Founder
+Android Costco/PX Mart/FamilyMart reruns remain mandatory.

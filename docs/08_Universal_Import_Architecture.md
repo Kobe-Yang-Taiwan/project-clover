@@ -1,4 +1,63 @@
-# Universal Import Architecture — V0.16
+# Universal Import Architecture — V0.16R
+
+## Source-adaptive router
+
+```text
+Source Router
+├ Native-text PDF → local PDF text/fragments/bounds → layout cells
+├ Image-only PDF  → render only required pages → consented vision
+├ Promo image     → consented product-region vision
+└ Local fallback  → OCR evidence → conservative legacy reconstruction
+
+All routes → Canonical Product + field evidence → deterministic validation
+           → DIRECT_IMPORT / NEEDS_CONFIRMATION / EXCLUDED → review → import
+```
+
+Native text reliability requires a meaningful text/fragment count and usable
+identity-character ratio. Reliable pages are never sent to cloud vision. Mixed
+PDFs may use native extraction for some pages and vision for only the remaining
+pages.
+
+## Canonical evidence model
+
+Every multimodal field contains value, page, product-region ID, raw visible
+evidence, confidence and optional normalized bounds. Product-specific evidence
+must equal and remain inside the reconstructed product region. Merchant, validity
+period and campaign condition may use an explicitly labelled page/shared/banner
+region on the same source page. Any other mismatch rejects the object and records
+cross-product contamination.
+
+Cloud output cannot write `Offer` records. It is parsed through a strict schema,
+then processed by the same price/date/product validation and review workflow.
+
+## Retailer adapters
+
+- Costco: merchant, repeated catalogue grid and ITEM／賣場售價／現省 semantics.
+- PX Mart: merchant, repeated product cards, bundle/average-unit-price semantics,
+  and shared payment campaign banners.
+- FamilyMart: merchant, repeated grid/card hints and shared campaign/UI rejection.
+- Generic: no assumed merchant or fixed grid.
+
+Adapters supply hints; they do not contain product identities.
+
+## Consent, provider and cost boundary
+
+The cloud provider is abstracted behind a canonical HTTPS contract. Production is
+disabled unless endpoint, provider identity and privacy disclosure are configured.
+Every import asks consent before sending the selected image or necessary scanned
+pages. Refusal causes no upload and retains manual/local fallback.
+
+Limits: 8 MB per cloud asset, one request per image/page/operation, duplicate-key
+blocking, no automatic retry, usage/cost reporting, no provider key in the APK.
+
+## Structured representation
+
+Native PDF fragments retain page and normalized bounds. Layout analysis emits a
+representation with `# Page`, `## Product Cell`, typed fields and shared metadata.
+Product-specific fields remain in their cell; applicable merchant/date information
+is the only shared inheritance path.
+
+## V0.16 architecture history
 
 ## V0.16 common document-understanding pipeline
 
@@ -38,6 +97,9 @@ Input → Pre-processing → Local OCR + spatial metadata → Layout segmentatio
 
 問題候選可由使用者主動選取。匯入時依序開啟所選問題項目，只修正未解欄位。所有選取候選均需具備名稱、商家與確認後的到期日，且不得保留關鍵 attention reason。通過後才呼叫單次批次寫入；成功後才申請／同步提醒。
 
-## Local-first and cleanup
+## V0.15 Local-first and cleanup history
 
-圖片、PDF、OCR 原文與產品資料不離開裝置。PDF 頁面暫存圖在完成、取消或失敗後清除。診斷報告只能包含區域數、狀態數、缺漏數與時間，不得包含標題、備註、OCR 原文或來源內容。
+V0.15/V0.16 were fully local. V0.16R remains Local-first but permits the
+Founder-approved, explicit-consent vision path documented above. PDF page temporary
+images are deleted after success, cancellation or failure. Coupon data, reminders,
+database and history are never part of a vision request.

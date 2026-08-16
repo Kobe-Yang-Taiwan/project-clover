@@ -1,0 +1,35 @@
+{
+  "sample_id": "familymart-founder-eight-product-failure",
+  "source_type": "promotional_image",
+  "merchant": "FamilyMart 全家便利商店",
+  "evidence_screenshot_sha256": "d0681c1fa875f83c95f5bdbfcade80292f374d6bb2da3af86928305ad46b4cab",
+  "original_asset_status": "required_for_final_identity_and_field_scoring",
+  "ground_truth_product_count": 8,
+  "expected_validity": null,
+  "expected_validity_reason": "not legible in the available evidence thumbnail",
+  "visible_region_prices": [35, 39, 39, 39, 79, 69, 40, 45],
+  "layout": {"rows": 4, "columns": 2},
+  "non_product_regions": [
+    "mobile status bar",
+    "browser or app header",
+    "shared campaign copy",
+    "bottom disclaimer and navigation"
+  ],
+  "known_v016_result": {"detected_product_count": 1, "recall": 0.125},
+  "maximum_cloud_requests": 1,
+  "release_gate": "blocked_until_original_asset_is_rerun_on_founder_android",
+  "acceptance_measurement": {
+    "status": "pending_original_asset_configured_provider_and_founder_android",
+    "detected_product_count": null,
+    "correct_product_count": null,
+    "product_recall": null,
+    "candidate_precision": null,
+    "field_accuracy": null,
+    "false_candidate_count": null,
+    "duplicate_rate": null,
+    "cross_product_contamination": null,
+    "review_burden": null,
+    "cloud_requests_used": null,
+    "estimated_processing_cost_usd": null
+  }
+}

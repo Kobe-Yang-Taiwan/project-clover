@@ -31,14 +31,14 @@ class ImportChoiceSheet extends StatelessWidget {
               key: const Key('image-import-choice'),
               leading: const Icon(Icons.image_outlined),
               title: const Text('匯入圖片'),
-              subtitle: const Text('在手機內辨識截圖，不上傳檔案'),
+              subtitle: const Text('優先使用本機；需要雲端視覺時會先詢問'),
               onTap: () => Navigator.of(context).pop(ImportChoice.image),
             ),
             ListTile(
               key: const Key('pdf-import-choice'),
               leading: const Icon(Icons.picture_as_pdf_outlined),
               title: const Text('匯入 PDF'),
-              subtitle: const Text('逐頁辨識後，由你挑選要建立的優惠'),
+              subtitle: const Text('原生文字 PDF 留在本機；掃描頁另行詢問'),
               onTap: () => Navigator.of(context).pop(ImportChoice.pdf),
             ),
           ],
@@ -49,6 +49,38 @@ class ImportChoiceSheet extends StatelessWidget {
 }
 
 enum ImportChoice { manual, image, pdf }
+
+Future<bool> _requestCloudConsent(
+  BuildContext context, {
+  required String assetDescription,
+  required String disclosure,
+}) async {
+  final accepted = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      title: const Text('是否使用雲端視覺辨識？'),
+      content: Text(
+        '只會傳送$assetDescription，不會傳送已儲存優惠、提醒、App 資料庫、'
+        '使用歷史或其他檔案。\n\n$disclosure\n\n'
+        '雲端結果仍會經過欄位證據與規則驗證，不會直接寫入優惠資料庫。',
+      ),
+      actions: [
+        TextButton(
+          key: const Key('decline-cloud-processing'),
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('只用本機'),
+        ),
+        FilledButton(
+          key: const Key('accept-cloud-processing'),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('同意本次傳送'),
+        ),
+      ],
+    ),
+  );
+  return accepted ?? false;
+}
 
 class ImageImportScreen extends StatefulWidget {
   const ImageImportScreen({
@@ -80,13 +112,36 @@ class _ImageImportScreenState extends State<ImageImportScreen> {
   }
 
   Future<void> _process() async {
-    final result = await widget.service.recognizeImage(widget.path);
+    SourceAdaptiveImportResult? adaptiveResult;
+    OcrPageResult? result;
+    if (widget.service case final SourceAdaptiveCouponImportService adaptive) {
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
+      final allowCloud = adaptive.cloudVisionAvailable
+          ? await _requestCloudConsent(
+              context,
+              assetDescription: '這次主動選取的 1 張圖片',
+              disclosure: adaptive.cloudVisionDisclosure,
+            )
+          : false;
+      if (!mounted) return;
+      adaptiveResult = await adaptive.analyzeImage(
+        widget.path,
+        allowCloudProcessing: allowCloud,
+      );
+      result = adaptiveResult.pages.isEmpty ? null : adaptiveResult.pages.first;
+    } else {
+      result = await widget.service.recognizeImage(widget.path);
+    }
     if (!mounted) return;
-    if (!result.succeeded) {
+    final hasStructuredProducts = adaptiveResult?.products.isNotEmpty ?? false;
+    if ((result == null || !result.succeeded) && !hasStructuredProducts) {
       setState(() => error = '無法辨識這張圖片，請換一張較清楚的圖片。');
       return;
     }
-    final parsed = widget.parser.parsePagesDetailed([result]);
+    final parsed = adaptiveResult == null
+        ? widget.parser.parsePagesDetailed([result!])
+        : widget.parser.parseAdaptive(adaptiveResult);
     if (parsed.candidates.isEmpty) {
       setState(() => error = '圖片中沒有可供檢查的商品優惠。');
       return;
@@ -102,6 +157,7 @@ class _ImageImportScreenState extends State<ImageImportScreen> {
           failedPages: 0,
           qualityReport: parsed.report,
           excludedCandidates: parsed.excludedCandidates,
+          processingNotice: _processingNotice(adaptiveResult),
           imagePath: widget.path,
           store: widget.store,
           reminders: widget.reminders,
@@ -116,7 +172,7 @@ class _ImageImportScreenState extends State<ImageImportScreen> {
       appBar: AppBar(title: const Text('檢查匯入內容')),
       body: error != null
           ? _ImportError(message: error!, onRetry: () => Navigator.pop(context))
-          : const _ImportLoading(label: '正在本機辨識圖片…'),
+          : const _ImportLoading(label: '正在分析圖片中的商品區域…'),
     );
   }
 }
@@ -154,15 +210,44 @@ class _PdfImportScreenState extends State<PdfImportScreen> {
 
   Future<void> _process() async {
     try {
-      final pages = await widget.service.recognizePdf(
-        widget.path,
-        onProgress: (value) {
-          if (mounted) setState(() => progress = value);
-        },
-        isCancelled: () => cancelled,
-      );
+      SourceAdaptiveImportResult? adaptiveResult;
+      late final List<OcrPageResult> pages;
+      if (widget.service
+          case final SourceAdaptiveCouponImportService adaptive) {
+        final plan = await adaptive.inspectPdf(widget.path);
+        if (!mounted || cancelled) return;
+        final allowCloud = plan.requiresVision && adaptive.cloudVisionAvailable
+            ? await _requestCloudConsent(
+                context,
+                assetDescription:
+                    '掃描 PDF 中需要視覺分析的 ${plan.visionPages.length} 頁'
+                    '（第 ${plan.visionPages.join('、')} 頁）',
+                disclosure: adaptive.cloudVisionDisclosure,
+              )
+            : false;
+        if (!mounted || cancelled) return;
+        adaptiveResult = await adaptive.analyzePdf(
+          widget.path,
+          allowCloudProcessing: allowCloud,
+          onProgress: (value) {
+            if (mounted) setState(() => progress = value);
+          },
+          isCancelled: () => cancelled,
+        );
+        pages = adaptiveResult.pages;
+      } else {
+        pages = await widget.service.recognizePdf(
+          widget.path,
+          onProgress: (value) {
+            if (mounted) setState(() => progress = value);
+          },
+          isCancelled: () => cancelled,
+        );
+      }
       if (!mounted || cancelled) return;
-      final parsed = widget.parser.parsePagesDetailed(pages);
+      final parsed = adaptiveResult == null
+          ? widget.parser.parsePagesDetailed(pages)
+          : widget.parser.parseAdaptive(adaptiveResult);
       final candidates = _markDuplicates(
         parsed.candidates,
         widget.store.allOffers,
@@ -178,6 +263,7 @@ class _PdfImportScreenState extends State<PdfImportScreen> {
             failedPages: pages.where((page) => !page.succeeded).length,
             qualityReport: parsed.report,
             excludedCandidates: parsed.excludedCandidates,
+            processingNotice: _processingNotice(adaptiveResult),
             store: widget.store,
             reminders: widget.reminders,
           ),
@@ -211,9 +297,9 @@ class _PdfImportScreenState extends State<PdfImportScreen> {
                       value: progress.completed / total,
                     ),
                     const SizedBox(height: 20),
-                    Text('正在本機處理第 ${progress.completed}／${progress.total} 頁'),
+                    Text('正在分析第 ${progress.completed}／${progress.total} 頁'),
                     const SizedBox(height: 8),
-                    const Text('圖片、PDF 與辨識文字都不會上傳。'),
+                    const Text('原生文字頁留在本機；需要傳送掃描頁時會先取得同意。'),
                     const SizedBox(height: 24),
                     OutlinedButton(
                       key: const Key('cancel-pdf-processing'),
@@ -304,8 +390,8 @@ class _CandidateEditorState extends State<CandidateEditor> {
           const Card(
             child: ListTile(
               leading: Icon(Icons.privacy_tip_outlined),
-              title: Text('全程在這支手機處理'),
-              subtitle: Text('儲存前請務必核對辨識結果，原始圖片不會存入優惠。'),
+              title: Text('辨識結果不是正式資料'),
+              subtitle: Text('儲存前請務必核對；原始圖片不會存入優惠資料。'),
             ),
           ),
           if (widget.candidate.needsReview)
@@ -370,7 +456,7 @@ class _CandidateEditorState extends State<CandidateEditor> {
           TextFormField(
             key: const Key('import-original-price-field'),
             controller: originalPrice,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
               labelText: '原價（未提供可留空）',
               errorText: priceError,
@@ -380,7 +466,7 @@ class _CandidateEditorState extends State<CandidateEditor> {
           TextFormField(
             key: const Key('import-promotional-price-field'),
             controller: promotionalPrice,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: _fieldDecoration(
               '優惠價',
               '優惠價',
@@ -462,8 +548,8 @@ class _CandidateEditorState extends State<CandidateEditor> {
     setState(() => attempted = true);
     if (!(formKey.currentState?.validate() ?? false) || expiration == null)
       return;
-    final parsedOriginal = int.tryParse(originalPrice.text.replaceAll(',', ''));
-    final parsedPromotional = int.tryParse(
+    final parsedOriginal = _parseAmount(originalPrice.text);
+    final parsedPromotional = _parseAmount(
       promotionalPrice.text.replaceAll(',', ''),
     );
     final parsedConditions = conditions.text
@@ -577,6 +663,7 @@ class BatchReviewScreen extends StatefulWidget {
     this.qualityReport,
     this.excludedCandidates = const [],
     this.imagePath,
+    this.processingNotice,
     super.key,
   });
 
@@ -587,6 +674,7 @@ class BatchReviewScreen extends StatefulWidget {
   final ImportQualityReport? qualityReport;
   final List<CouponCandidate> excludedCandidates;
   final String? imagePath;
+  final String? processingNotice;
 
   @override
   State<BatchReviewScreen> createState() => _BatchReviewScreenState();
@@ -600,6 +688,7 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
     });
   bool needsReviewOnly = false;
   bool saving = false;
+  bool showProcessingNotice = true;
 
   List<CouponCandidate> get visible => needsReviewOnly
       ? candidates.where((candidate) => candidate.needsReview).toList()
@@ -615,6 +704,16 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
       appBar: AppBar(title: const Text('選擇要匯入的優惠')),
       body: Column(
         children: [
+          if (widget.processingNotice != null && showProcessingNotice)
+            MaterialBanner(
+              content: Text(widget.processingNotice!),
+              actions: [
+                TextButton(
+                  onPressed: () => setState(() => showProcessingNotice = false),
+                  child: const Text('知道了'),
+                ),
+              ],
+            ),
           if (widget.failedPages > 0)
             MaterialBanner(
               content: Text('${widget.failedPages} 頁辨識失敗，其餘頁面仍可繼續檢查。'),
@@ -891,6 +990,24 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
   }
 }
 
+String? _processingNotice(SourceAdaptiveImportResult? result) {
+  if (result == null) return null;
+  if (result.cloudUsage.requestCount > 0) {
+    final cost = result.cloudUsage.estimatedCostUsd > 0
+        ? '；估計成本 US\$${result.cloudUsage.estimatedCostUsd.toStringAsFixed(4)}'
+        : '';
+    return '本次經同意使用雲端視覺 ${result.cloudUsage.requestCount} 次，'
+        '傳送 ${(result.cloudUsage.transmittedBytes / 1024).ceil()} KB$cost。';
+  }
+  if (result.cloudWasDeclined) {
+    return '你已選擇只用本機處理；多商品圖片或掃描頁的辨識效果可能較低。';
+  }
+  if (result.localFallbackUsed) {
+    return '雲端視覺未設定或無法使用，本次已改用本機辨識；結果可能需要較多確認。';
+  }
+  return 'Native-text PDF 已使用本機文字與版面解析，未上傳 PDF。';
+}
+
 class _ImportLoading extends StatelessWidget {
   const _ImportLoading({required this.label});
   final String label;
@@ -988,6 +1105,14 @@ String _note(CouponCandidate candidate) => [
 
 String _date(DateTime value) =>
     '${value.year}/${value.month.toString().padLeft(2, '0')}/${value.day.toString().padLeft(2, '0')}';
+
+num? _parseAmount(String text) {
+  final parsed = num.tryParse(text.replaceAll(',', '').trim());
+  if (parsed == null) return null;
+  return parsed is double && parsed == parsed.roundToDouble()
+      ? parsed.toInt()
+      : parsed;
+}
 
 String _category(OfferCategory value) => switch (value) {
   OfferCategory.foodAndDrink => '食品飲料',
