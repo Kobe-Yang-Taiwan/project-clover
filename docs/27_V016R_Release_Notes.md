@@ -1,6 +1,6 @@
 # Project Clover V0.16R / 0.16.1 Release Notes
 
-Status: engineering remediation; not Founder accepted.
+Status: FOUNDER_TEST; engineering/CI complete, not Founder accepted.
 
 ## Import behavior changed
 
@@ -26,6 +26,7 @@ validation remain the persistence path. Cloud output is never directly saved.
 
 ## Acceptance
 
-Local format, analysis and 120 Flutter tests pass. Local Android build is blocked
-by the runner's missing Android SDK; GitHub Actions CI/APK is pending. Founder
-Android Costco/PX Mart/FamilyMart reruns remain mandatory.
+Local format, analysis and 120 Flutter tests pass. The local runner has no Android
+SDK; GitHub Actions run #91 is the authoritative successful Build 17 Android debug
+APK result (artifact `9260093101`). Founder Android Costco/PX Mart/FamilyMart
+reruns remain mandatory.

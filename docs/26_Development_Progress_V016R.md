@@ -1,6 +1,6 @@
 # Development Progress — V0.16R / 0.16.1
 
-State: READY_TO_PUSH
+State: FOUNDER_TEST
 
 ## Root causes verified
 
@@ -42,8 +42,15 @@ State: READY_TO_PUSH
 - A local Flutter-test attempt against the real Costco PDF could not load Linux
   PDFium because Flutter test did not bundle the native asset. No real-world metric
   is inferred from that failed probe; Android Golden Dataset execution remains G7.
+- GitHub Actions run #91 (second attempt): PASS. Format, analyze, 120 tests,
+  Android Build 17 debug APK and artifact upload all succeeded. The first attempt
+  failed only because Maven Central returned HTTP 429 while Gradle downloaded
+  dependencies; no code change was used to conceal that external failure.
+- APK artifact ID: `9260093101`; archive size: `111,633,047 bytes`; SHA-256:
+  `b1777009e7666389406c64ec01ee2e35aaa7039ad82803f50dc77f96e46f4073`;
+  expires `2026-08-30T07:28:01Z`.
 
 ## Gate
 
-G2 PASS. G3 PASS. G4 READY_TO_PUSH. G6 CI/APK pending. Founder Android Golden
-Dataset acceptance remains G7.
+G0–G6 PASS. State is FOUNDER_TEST. Founder Android Golden Dataset acceptance
+remains G7; no real-world metric is marked pass yet.

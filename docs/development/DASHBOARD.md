@@ -5,14 +5,14 @@ _Last updated: 2026-08-16_
 ## Executive Status
 
 - Current version: V0.16R / 0.16.1 — Import Architecture Remediation
-- Current state: READY_TO_PUSH
+- Current state: FOUNDER_TEST
 - Development branch: `agent/flutter-prototype-v0`
 - Draft PR: #1 (Open, Draft, not merged)
-- CI evidence head: `276ec73fa145d758608bf1c6b70700d0aa8f50cc`
+- V0.16R CI evidence head: `7d5f296e93f212b7a6ebd1e3beff97d4bec8a5bc`
 - V0.16 Founder Acceptance: FAILED — real images had severe false negatives and
   Costco fields remained polluted/mixed.
 - V0.16R privacy architecture: Hybrid Local-first approved 2026-08-16.
-- V0.16R CI/build: pending; V0.16 run #89 remains historical evidence only.
+- V0.16R CI/build: run #91 PASS; Android Build 17 artifact `9260093101`.
 - Founder Acceptance: pending V0.16R Costco/PX Mart/FamilyMart rerun.
 
 ## Product Progress
@@ -62,10 +62,10 @@ _Last updated: 2026-08-16_
 | G1 | Repo/worktree inspection | PASS |
 | G2 | Implementation | PASS |
 | G3 | Local QA | PASS — analyze clean, 120 tests |
-| G4 | Commit / integration | READY TO PUSH |
+| G4 | Commit / integration | PASS |
 | G5 | Release authorization | PASS |
-| G6 | GitHub CI + Android APK | PENDING (local runner has no Android SDK) |
-| G7 | Founder Android Acceptance | BLOCKED UNTIL G6 |
+| G6 | GitHub CI + Android APK | PASS — run #91, artifact 9260093101 |
+| G7 | Founder Android Acceptance | READY / PENDING REAL METRICS |
 | G8 | Accepted / Release-ready | NOT STARTED |
 
 ## Current Acceptance Work

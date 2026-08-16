@@ -1,7 +1,7 @@
 # V0.16R / 0.16.1 Founder Android Acceptance Checklist
 
 Test build: `0.16.1 (Build 17)`
-State: NOT READY — CI/APK and Founder real-device metrics pending
+State: READY FOR FOUNDER TEST — G0–G6 pass; G7 metrics pending
 
 ## Privacy and routing
 
@@ -51,7 +51,8 @@ State: NOT READY — CI/APK and Founder real-device metrics pending
 ## Engineering regression
 
 - [x] Format, analyze and all Flutter tests pass (120 tests, 2026-08-16).
-- [ ] Android debug APK builds and installs.
+- [x] Android Build 17 debug APK builds in GitHub Actions run #91.
+- [ ] Android APK installs and launches on Founder device.
 - [ ] Manual entry, storage, backup/restore, reminder and earlier import flows pass.
 
 Do not mark accepted if any P0 item fails. Do not merge `main`.
