@@ -1,23 +1,33 @@
-name: Flutter checks
+name: Founder Gemini APK
 
 on:
-  pull_request:
   workflow_dispatch:
+    inputs:
+      proxy_endpoint:
+        description: HTTPS Clover proxy /v1/import/analyze endpoint
+        required: true
+        type: string
 
 permissions:
   contents: read
 
-concurrency:
-  group: flutter-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  verify-and-build:
+  founder-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: founder-test
+    env:
+      CLOVER_VISION_ENDPOINT: ${{ inputs.proxy_endpoint }}
+      CLOVER_VISION_ACCESS_TOKEN: ${{ secrets.CLOVER_VISION_ACCESS_TOKEN }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+
+      - name: Validate Founder provider configuration
+        shell: bash
+        run: |
+          [[ "$CLOVER_VISION_ENDPOINT" == https://* ]]
+          [[ -n "$CLOVER_VISION_ACCESS_TOKEN" ]]
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -28,7 +38,7 @@ jobs:
       - name: Generate Android platform files
         run: flutter create --platforms=android --org tw.projectclover --project-name project_clover --no-pub .
 
-      - name: Configure Android notifications
+      - name: Configure Android notifications and network
         run: python3 tool/configure_android_notifications.py
 
       - name: Install dependencies
@@ -49,13 +59,18 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build Android debug APK
-        run: flutter build apk --debug
+      - name: Build provider-enabled Founder APK
+        shell: bash
+        run: |
+          flutter build apk --debug \
+            --dart-define=CLOVER_VISION_ENDPOINT="$CLOVER_VISION_ENDPOINT" \
+            --dart-define=CLOVER_VISION_ACCESS_TOKEN="$CLOVER_VISION_ACCESS_TOKEN" \
+            --dart-define=CLOVER_GEMINI_PAID_SERVICE=true
 
-      - name: Upload Android APK
+      - name: Upload Founder Android APK
         uses: actions/upload-artifact@v6
         with:
-          name: project-clover-build-18-android-debug
+          name: project-clover-build-18-gemini-founder-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7

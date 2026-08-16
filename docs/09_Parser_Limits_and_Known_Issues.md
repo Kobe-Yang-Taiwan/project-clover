@@ -2,9 +2,11 @@
 
 ## V0.16R known limitations
 
-- Production cloud vision is disabled until a provider/proxy and complete privacy
-  disclosure are configured. The standard APK therefore uses local fallback for
-  promotional images and scanned pages.
+- Paid Gemini `gemini-3.6-flash` is approved, but the standard APK remains cloud-
+  disabled. A provider-enabled Founder APK requires a deployed Clover HTTPS proxy,
+  paid-project Gemini secret and protected short-lived proxy token.
+- Paid Gemini is not ZDR. Google states paid prompts/images/responses are not used
+  to improve its products, while limited abuse-monitoring retention still applies.
 - The FamilyMart original selected image is not present; only Founder failure
   evidence/thumbnail remains. Product-count regression is labelled, but full
   identity/field accuracy cannot be scored until the original is supplied again.

@@ -12,6 +12,8 @@ _Last updated: 2026-08-16_
 - V0.16 Founder Acceptance: FAILED — real images had severe false negatives and
   Costco fields remained polluted/mixed.
 - V0.16R privacy architecture: Hybrid Local-first approved 2026-08-16.
+- Founder Test provider: paid Google Gemini Developer API `gemini-3.6-flash`
+  through the Clover proxy; provider-enabled Build 18 pending secure configuration.
 - V0.16R CI/build: run #91 PASS; Android Build 17 artifact `9260093101`.
 - Founder Acceptance: pending V0.16R Costco/PX Mart/FamilyMart rerun.
 
@@ -60,11 +62,11 @@ _Last updated: 2026-08-16_
 |---|---|---|
 | G0 | Approved scope/spec | PASS |
 | G1 | Repo/worktree inspection | PASS |
-| G2 | Implementation | PASS |
-| G3 | Local QA | PASS — analyze clean, 120 tests |
-| G4 | Commit / integration | PASS |
+| G2 | Implementation | PASS — Gemini Founder integration |
+| G3 | Local QA | PASS — analyze, 123 Flutter + 4 proxy tests |
+| G4 | Commit / integration | PENDING |
 | G5 | Release authorization | PASS |
-| G6 | GitHub CI + Android APK | PASS — run #91, artifact 9260093101 |
+| G6 | GitHub CI + Android APK | Build 17 PASS; Build 18 PENDING |
 | G7 | Founder Android Acceptance | READY / PENDING REAL METRICS |
 | G8 | Accepted / Release-ready | NOT STARTED |
 

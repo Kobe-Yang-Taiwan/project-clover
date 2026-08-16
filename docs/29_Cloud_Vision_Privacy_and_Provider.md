@@ -1,76 +1,66 @@
 # Cloud Vision Privacy and Provider Gate
 
-## Current production state
+## Founder Test selection
 
-Provider: **not selected / production disabled**.
-
-| Production disclosure item | Current status |
+| Item | Approved configuration |
 |---|---|
-| Provider/model | Not selected; blocked from production activation |
-| Transmitted data | One selected image or one required rendered scanned page |
-| Retention | Unknown until provider selection; never assumed safe |
-| Model training | Unknown until provider selection; never assumed safe |
-| Deletion policy | Unknown until provider selection; never assumed safe |
-| Transport | HTTPS required and enforced by configuration validation |
-| Estimated cost/image or page | Provider-configured or server-reported; currently unknown |
-| Failure behavior | No retry; local fallback and no database mutation |
-| Privacy policy impact | Must be reviewed before production activation |
+| Provider | Google Gemini Developer API |
+| Model | `gemini-3.6-flash` |
+| Service mode | Paid project with active billing only |
+| Network path | Android → Clover HTTPS proxy → Gemini API |
+| Training use | Google states Paid Service prompts/images/responses are not used to improve Google products |
+| Retention | Limited abuse-monitoring logging applies; normal Paid Service is not claimed as ZDR |
+| Deletion | Clover proxy persists no payload; normal Paid API has no Clover-controlled per-request deletion mechanism documented |
+| Transport | HTTPS app-to-proxy and proxy-to-Gemini |
+| Grounding/tools | Search, Maps and unrelated tools disabled |
+| Files/cache | Not used for Founder Test |
+| Pricing through 2026-12-31 | US$0.75/M input tokens + US$3.75/M output/thinking tokens |
 
-The standard APK contains no provider API key and makes no cloud request. Cloud
-vision activates only when all of these build-time values are present:
+Official references: [Gemini API Paid Service terms](https://ai.google.dev/gemini-api/terms),
+[billing and paid tier](https://ai.google.dev/gemini-api/docs/billing), and
+[Gemini 3.6 Flash pricing](https://ai.google.dev/gemini-api/docs/pricing).
 
-- `CLOVER_VISION_ENDPOINT` — HTTPS proxy endpoint;
-- `CLOVER_VISION_PROVIDER` — provider/model identity;
-- `CLOVER_VISION_PRIVACY_DISCLOSURE` — consent text covering retention, training,
-  deletion and transport behavior.
+## Data minimization and consent
 
-An optional short-lived proxy access token may be configured for controlled debug
-testing. A permanent upstream model key must never be embedded in the APK.
+Every cloud request requires the user to tap `同意並開始辨識`. Transmitted data is
+one selected promotional image or one rendered scanned PDF page that lacks reliable
+native text, plus source/page/retailer hints and extraction/schema instructions.
 
-## Data contract
+Never transmitted: coupons, reminders, database, favourites, history, backups,
+device file inventory, unrelated files/pages, or reliable native-text PDF pages.
+Cancellation sends zero bytes and keeps local/manual fallback available.
 
-Transmitted: one user-selected image or one rendered PDF page that lacks reliable
-native text, MIME type, page number and retailer hint.
+## Secret and proxy boundary
 
-Never transmitted: coupons, reminders, database, history, unrelated files or
-native-text PDF pages.
+`GeminiCloudVisionProvider` speaks only the canonical Clover proxy contract. The
+Gemini key is read from server-side `GEMINI_API_KEY`; it is prohibited from Android
+source, build defines and APKs. The proxy requires `GEMINI_SERVICE_MODE=paid`, a
+short-lived `CLOVER_PROXY_TOKEN`, an 8 MB asset limit, rate limit, duplicate key,
+strict response schema and exact model metadata. It does not persist or log raw
+images or full model input/output.
 
-Transport: HTTPS only. HTTP endpoints are rejected.
+The separate `Founder Gemini APK` workflow requires:
 
-## Retention/training/deletion gate
+- workflow input: deployed HTTPS `/v1/import/analyze` endpoint;
+- GitHub `founder-test` environment secret: `CLOVER_VISION_ACCESS_TOKEN`.
 
-Production must not be enabled until the selected provider/proxy documents:
+The Gemini key belongs only in the proxy runtime/secret manager, never GitHub's APK
+build job. Normal CI builds remain cloud-disabled.
 
-- exact provider and model;
-- retention duration and deletion behavior;
-- whether input/output is used for model training;
-- encryption in transit and proxy logging;
-- incident/failure handling;
-- pricing and cost alert owner;
-- privacy policy/Data Safety impact.
+## Failure and cost behavior
 
-Unknown policy is not interpreted as safe.
+There is no automatic retry. Timeout, provider mismatch, unpaid mode, invalid JSON/
+schema, oversize, duplicate, auth/rate failure or non-2xx response performs one
+controlled failure and returns to local OCR/manual review without database mutation.
 
-## Candidate provider note
+The proxy returns input/output/total tokens. Clover estimates request cost from the
+current approved Standard paid rates and records count, transmitted bytes, tokens,
+failures and estimated cost in the in-memory import quality report. Pricing is
+time-sensitive and must be rechecked before production release.
 
-An OpenAI API-backed proxy is technically compatible with the canonical contract.
-OpenAI states API data is not used for training by default unless opted in, and
-standard abuse-monitoring retention may be up to 30 days; eligible customers may
-request zero data retention. This is a candidate evaluation, not a production
-selection or activation. See the official [OpenAI API data controls](https://developers.openai.com/api/docs/guides/your-data).
+## Production hardening still required
 
-## Failure behavior
-
-Timeout, invalid schema, oversize input, duplicate request or non-2xx response
-causes one controlled failure. There is no automatic retry. The app falls back to
-local OCR and warns that multi-product accuracy may be lower. Existing data remains
-unchanged.
-
-## Cost controls
-
-- 8 MB maximum per image/page request;
-- one request per asset/page per import operation;
-- only pages without reliable native text;
-- no automatic retry;
-- request count, bytes, failures and estimated/server-reported cost retained in the
-  in-memory import quality report, not the coupon database.
+Before production enablement: approve proxy hosting/region, access control, log
+retention, alerts/spend cap, incident owner, privacy policy/Data Safety wording and
+whether an eligible ZDR arrangement is required. Founder Test approval is not a
+store-production privacy approval.

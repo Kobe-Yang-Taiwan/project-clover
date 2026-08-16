@@ -324,6 +324,7 @@ class CouponParser {
         '價格互相衝突',
       if (discountConflict) '折扣與價格互相衝突',
       if (ownershipViolation) '跨商品欄位污染',
+      ...product.uncertainFields.map((field) => '$field 需要確認'),
     ];
     final rejected =
         ownershipViolation || nonProduct || baseName.isEmpty || title.isEmpty;

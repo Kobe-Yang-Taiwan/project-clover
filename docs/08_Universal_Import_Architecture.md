@@ -42,13 +42,19 @@ Adapters supply hints; they do not contain product identities.
 
 ## Consent, provider and cost boundary
 
-The cloud provider is abstracted behind a canonical HTTPS contract. Production is
-disabled unless endpoint, provider identity and privacy disclosure are configured.
+The cloud provider is abstracted behind a canonical HTTPS contract. Founder Test
+uses `GeminiCloudVisionProvider → Clover proxy → paid Gemini Developer API
+gemini-3.6-flash`. The Android core never imports Gemini SDK types or contains the
+upstream API key. Production is disabled unless the HTTPS endpoint, paid-mode gate
+and privacy disclosure are configured.
 Every import asks consent before sending the selected image or necessary scanned
 pages. Refusal causes no upload and retains manual/local fallback.
 
 Limits: 8 MB per cloud asset, one request per image/page/operation, duplicate-key
 blocking, no automatic retry, usage/cost reporting, no provider key in the APK.
+The proxy additionally enforces authorization, rate limits, canonical response
+schema and exact provider/model/service-mode metadata. Search/Maps grounding,
+Files API and caching are not enabled.
 
 ## Structured representation
 

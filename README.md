@@ -2,7 +2,7 @@
 
 Project Clover 是一款 Android 優先的優惠管理原型，協助使用者快速看見即將到期的優惠，避免已擁有的價值因遺忘而浪費。
 
-## V0.16 Import Accuracy & Reconstruction 已包含
+## V0.16R Import Architecture Remediation 已包含
 
 - 圖片與 PDF 共用文件理解與商品重建管線
 - 先辨識商品 cell，再從 cell 內關聯名稱、品牌、ITEM、規格、價格與優惠條件
@@ -11,6 +11,8 @@ Project Clover 是一款 Android 優先的優惠管理原型，協助使用者�
 - 日期只在明確屬於商品或整體活動有效期間時使用
 - 可直接匯入項目預選；待確認項目只修正不確定欄位；已排除內容可另行檢視
 - 100% 代表最終寫入資料通過驗證，不代表假裝 OCR 永遠正確
+- 原生文字 PDF 預設完全本機處理；只有選取的促銷圖片或必要掃描頁可在逐次同意後傳送
+- Founder Test 使用付費 Gemini `gemini-3.6-flash`，Android 只連 Clover proxy，不包含 Gemini API key
 
 ## V0.15 Smart Universal Import 歷史功能
 
@@ -90,8 +92,9 @@ Project Clover 是一款 Android 優先的優惠管理原型，協助使用者�
 
 ## 資料與隱私
 
-- 優惠資料只儲存在使用者自己的 Android 手機
-- 本版不會把資料上傳到網路或雲端
+- 優惠、提醒、資料庫、歷史與備份只儲存在使用者自己的 Android 手機
+- Native-text PDF 留在本機。只有本次選取的圖片或必要掃描頁，才可在使用者明確同意後傳至 AI 服務
+- 拒絕雲端處理時傳送 0 bytes，仍可使用本機辨識與手動輸入
 - 解除安裝 App 或清除 App 資料會刪除 App 內資料；請先將備份檔保存到其他位置
 - 備份與還原使用 Android 原生檔案選擇畫面，不會上傳 Project Clover 伺服器
 - 還原會取代手機目前資料，執行前會顯示備份時間及筆數並要求確認

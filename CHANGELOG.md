@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.1+18 — Gemini Founder-Test Provider
+
+- 新增 `GeminiCloudVisionProvider`，固定 Founder Test 模型 `gemini-3.6-flash`，且只允許明確確認的 Paid Service。
+- 新增最小 Clover proxy：Gemini 金鑰只存在伺服器端，具備驗證、8 MB、rate limit、duplicate 與 schema protection。
+- Gemini 回傳仍轉成 provider-neutral canonical model，再經 evidence、validation、confidence 與 review。
+- 雲端用量新增 input/output/total token 與實際估計成本；不使用 Search／Maps grounding、Files API 或 caching。
+- 新增獨立 Founder APK workflow；缺少 HTTPS proxy 或短效 proxy token 時會拒絕產生 provider-enabled APK。
+
 ## 0.16.1+17 — Source-Adaptive Import Remediation
 
 - Native-text PDF 改以本機文字、座標與 product-cell ownership 重建，不再優先整頁 OCR。

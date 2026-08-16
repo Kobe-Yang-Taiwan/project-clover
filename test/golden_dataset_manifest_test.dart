@@ -24,6 +24,9 @@ void main() {
         'cross_product_contamination',
         'review_burden',
         'cloud_requests_used',
+        'cloud_input_tokens',
+        'cloud_output_tokens',
+        'cloud_total_tokens',
         'estimated_processing_cost_usd',
       }),
     );

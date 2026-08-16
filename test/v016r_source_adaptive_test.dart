@@ -346,6 +346,129 @@ void main() {
     expect(provider.isConfigured, isFalse);
   });
 
+  test('Gemini provider requires paid mode and exact proxy identity', () async {
+    final response = jsonEncode({
+      'provider': 'google-gemini-developer-api',
+      'model': 'gemini-3.6-flash',
+      'service_mode': 'paid',
+      'products': [
+        {
+          'product_region_id': 'card-1',
+          'region_evidence': {
+            'text': '鮮乳 89元',
+            'confidence': 0.98,
+            'region_id': 'card-1',
+          },
+          'product_name': {
+            'value': '鮮乳',
+            'evidence': {
+              'text': '鮮乳',
+              'confidence': 0.98,
+              'region_id': 'card-1',
+            },
+          },
+          'promotional_price': {
+            'value': 89,
+            'evidence': {
+              'text': '89元',
+              'confidence': 0.98,
+              'region_id': 'card-1',
+            },
+          },
+          'uncertain_fields': ['valid_until'],
+        },
+      ],
+      'usage': {
+        'input_tokens': 1000,
+        'output_tokens': 200,
+        'total_tokens': 1200,
+        'estimated_cost_usd': 0.0015,
+      },
+    });
+    final unpaid = GeminiCloudVisionProvider(
+      endpoint: 'https://proxy.example.test/v1/import/analyze',
+      privacyDisclosure: GeminiCloudVisionProvider.defaultPrivacyDisclosure,
+      paidServiceConfirmed: false,
+      client: MockClient(
+        (_) async => http.Response(
+          response,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        ),
+      ),
+    );
+    expect(unpaid.isConfigured, isFalse);
+
+    final paid = GeminiCloudVisionProvider(
+      endpoint: 'https://proxy.example.test/v1/import/analyze',
+      privacyDisclosure: GeminiCloudVisionProvider.defaultPrivacyDisclosure,
+      paidServiceConfirmed: true,
+      client: MockClient(
+        (_) async => http.Response(
+          response,
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        ),
+      ),
+    );
+    final result = await paid.analyze(
+      VisionAsset(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        mimeType: 'image/png',
+        sourceType: ImportSourceType.image,
+        requestKey: 'gemini-founder-image',
+        retailerHint: 'familymart',
+      ),
+    );
+    expect(result.products.single.regionId, 'card-1');
+    expect(result.products.single.promotionalPrice?.value, 89);
+    expect(result.products.single.uncertainFields, ['valid_until']);
+    expect(result.usage.inputTokenCount, 1000);
+    expect(result.usage.outputTokenCount, 200);
+    expect(result.usage.totalTokenCount, 1200);
+  });
+
+  test(
+    'Gemini provider rejects a proxy that reports a different model',
+    () async {
+      final provider = GeminiCloudVisionProvider(
+        endpoint: 'https://proxy.example.test/v1/import/analyze',
+        privacyDisclosure: GeminiCloudVisionProvider.defaultPrivacyDisclosure,
+        paidServiceConfirmed: true,
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'provider': 'google-gemini-developer-api',
+              'model': 'gemini-other',
+              'service_mode': 'paid',
+              'products': [],
+            }),
+            200,
+          ),
+        ),
+      );
+
+      await expectLater(
+        provider.analyze(
+          VisionAsset(
+            bytes: Uint8List.fromList([1]),
+            mimeType: 'image/png',
+            sourceType: ImportSourceType.image,
+            requestKey: 'wrong-model',
+            retailerHint: 'generic',
+          ),
+        ),
+        throwsA(
+          isA<CloudVisionUnavailableException>().having(
+            (error) => error.code,
+            'code',
+            'gemini_provider_identity_mismatch',
+          ),
+        ),
+      );
+    },
+  );
+
   test(
     'cloud value without matching visible evidence remains unknown',
     () async {

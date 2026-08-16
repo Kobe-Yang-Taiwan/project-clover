@@ -2,6 +2,11 @@
 
 Status: FOUNDER_TEST; engineering/CI complete, not Founder accepted.
 
+Build 18 adds the Founder-approved paid Gemini `gemini-3.6-flash` provider and a
+small Clover-controlled proxy. The standard CI APK stays cloud-disabled; the
+separate Founder workflow enables Gemini only with an HTTPS proxy and protected
+short-lived proxy token.
+
 ## Import behavior changed
 
 - Native-text PDFs are parsed locally with layout and bounding boxes instead of
@@ -17,7 +22,7 @@ Status: FOUNDER_TEST; engineering/CI complete, not Founder accepted.
 - Decimal values are supported; average/unit prices remain distinct from promotion
   totals and conditions.
 - Review shows whether cloud or local fallback was used and reports request/byte/
-  estimated-cost information.
+  token/estimated-cost information.
 
 ## Safety
 

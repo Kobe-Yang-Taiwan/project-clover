@@ -97,7 +97,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('是否使用雲端視覺辨識？'), findsOneWidget);
+    expect(find.text('AI 智慧辨識'), findsOneWidget);
+    expect(find.text('同意並開始辨識'), findsOneWidget);
     expect(service.analyzeCalls, 0);
 
     await tester.tap(find.byKey(const Key('decline-cloud-processing')));
@@ -162,6 +163,52 @@ void main() {
     expect(find.text('選擇要匯入的優惠'), findsOneWidget);
     expect(find.text('測試牛乳'), findsOneWidget);
     expect(service.lastAllowCloudProcessing, isTrue);
+  });
+
+  testWidgets('scanned PDF asks consent before every cloud page request', (
+    tester,
+  ) async {
+    const evidence = FieldEvidence(
+      sourceType: ImportSourceType.pdf,
+      extractionMethod: ImportExtractionMethod.cloudVision,
+      sourcePage: 1,
+      regionId: 'p1-card1',
+      rawText: '測試鮮乳 89元',
+      confidence: 0.98,
+    );
+    final service = ConsentImportService(
+      products: const [
+        ReconstructedProduct(
+          regionId: 'p1-card1',
+          sourceType: ImportSourceType.pdf,
+          sourcePage: 1,
+          productName: EvidencedValue(value: '測試鮮乳', evidence: evidence),
+          promotionalPrice: EvidencedValue(value: 89, evidence: evidence),
+          regionEvidence: evidence,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PdfImportScreen(
+          path: '/fixture/scanned.pdf',
+          service: service,
+          store: OfferStore(initialOffers: []),
+          reminders: RecordingReminderScheduler(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.textContaining('第 1 頁'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('accept-cloud-processing')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('第 2 頁'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('decline-cloud-processing')));
+    await tester.pumpAndSettle();
+
+    expect(service.pdfPageConsents, [true, false]);
   });
 
   testWidgets('confirmed candidate creates exactly one coupon', (tester) async {
@@ -801,6 +848,7 @@ class ConsentImportService
   final List<ReconstructedProduct> products;
   int analyzeCalls = 0;
   bool? lastAllowCloudProcessing;
+  final List<bool> pdfPageConsents = [];
 
   @override
   bool get cloudVisionAvailable => true;
@@ -840,12 +888,34 @@ class ConsentImportService
   Future<SourceAdaptiveImportResult> analyzePdf(
     String path, {
     required bool allowCloudProcessing,
+    Future<bool> Function(int pageNumber)? requestCloudPageConsent,
     required void Function(ImportProgress progress) onProgress,
     required bool Function() isCancelled,
-  }) => throw UnimplementedError();
+  }) async {
+    for (final page in const [1, 2]) {
+      pdfPageConsents.add(
+        allowCloudProcessing &&
+            (await requestCloudPageConsent?.call(page) ?? false),
+      );
+    }
+    return SourceAdaptiveImportResult(
+      route: ImportRoute.scannedPdf,
+      pages: const [],
+      products: products,
+      cloudUsage: CloudProcessingUsage(
+        requestCount: pdfPageConsents.where((value) => value).length,
+      ),
+      cloudWasDeclined: pdfPageConsents.any((value) => !value),
+      localFallbackUsed: pdfPageConsents.any((value) => !value),
+    );
+  }
 
   @override
-  Future<PdfSourcePlan> inspectPdf(String path) => throw UnimplementedError();
+  Future<PdfSourcePlan> inspectPdf(String path) async => const PdfSourcePlan(
+    pageCount: 2,
+    nativeTextPages: [],
+    visionPages: [1, 2],
+  );
 
   @override
   Future<String?> pickImage() async => null;

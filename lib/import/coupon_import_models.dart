@@ -166,6 +166,7 @@ class ReconstructedProduct {
     this.category,
     this.notes,
     this.regionEvidence,
+    this.uncertainFields = const [],
   });
 
   final String regionId;
@@ -186,6 +187,7 @@ class ReconstructedProduct {
   final EvidencedValue<String>? category;
   final EvidencedValue<String>? notes;
   final FieldEvidence? regionEvidence;
+  final List<String> uncertainFields;
 
   Iterable<FieldEvidence> get allEvidence sync* {
     if (regionEvidence != null) yield regionEvidence!;
@@ -217,6 +219,9 @@ class CloudProcessingUsage {
     this.transmittedBytes = 0,
     this.estimatedCostUsd = 0,
     this.failureCount = 0,
+    this.inputTokenCount = 0,
+    this.outputTokenCount = 0,
+    this.totalTokenCount = 0,
   });
 
   final String provider;
@@ -224,6 +229,9 @@ class CloudProcessingUsage {
   final int transmittedBytes;
   final double estimatedCostUsd;
   final int failureCount;
+  final int inputTokenCount;
+  final int outputTokenCount;
+  final int totalTokenCount;
 
   CloudProcessingUsage operator +(CloudProcessingUsage other) =>
       CloudProcessingUsage(
@@ -232,6 +240,9 @@ class CloudProcessingUsage {
         transmittedBytes: transmittedBytes + other.transmittedBytes,
         estimatedCostUsd: estimatedCostUsd + other.estimatedCostUsd,
         failureCount: failureCount + other.failureCount,
+        inputTokenCount: inputTokenCount + other.inputTokenCount,
+        outputTokenCount: outputTokenCount + other.outputTokenCount,
+        totalTokenCount: totalTokenCount + other.totalTokenCount,
       );
 }
 
@@ -505,6 +516,9 @@ class ImportQualityReport {
     'cloud_transmitted_bytes': cloudUsage.transmittedBytes,
     'cloud_estimated_cost_usd': cloudUsage.estimatedCostUsd,
     'cloud_failure_count': cloudUsage.failureCount,
+    'cloud_input_tokens': cloudUsage.inputTokenCount,
+    'cloud_output_tokens': cloudUsage.outputTokenCount,
+    'cloud_total_tokens': cloudUsage.totalTokenCount,
   };
 }
 

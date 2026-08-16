@@ -28,6 +28,14 @@ State: FOUNDER_TEST
 - [x] Native and cloud-derived candidate fields retain field-level provenance.
 - [x] Costco native layout uses four independent column grids so unequal row
   counts cannot move fields into an adjacent column.
+- [x] Founder-approved `GeminiCloudVisionProvider` remains behind the neutral
+  `CloudVisionProvider` interface and requires exact paid provider/model metadata.
+- [x] Minimal stateless proxy keeps the Gemini key server-side and enforces auth,
+  payload, rate, duplicate, schema and cost controls.
+- [x] Dedicated Founder APK workflow requires an HTTPS proxy and protected
+  short-lived proxy token before enabling cloud processing.
+- [x] Input/output/total token usage and token-derived cost flow into the import
+  quality report and Golden Dataset measurement schema.
 
 ## QA evidence — 2026-08-16
 
@@ -54,3 +62,17 @@ State: FOUNDER_TEST
 
 G0–G6 PASS. State is FOUNDER_TEST. Founder Android Golden Dataset acceptance
 remains G7; no real-world metric is marked pass yet.
+
+Build 18 local QA/CI evidence is recorded only after the corresponding commands and
+workflow execute; previous Build 17 evidence remains historical and is not relabelled.
+
+## Build 18 local QA — 2026-08-16
+
+- Format check: PASS, 28 files, 0 changed.
+- `flutter analyze`: PASS, no issues.
+- Full `flutter test`: PASS, 123 tests.
+- Proxy privacy/schema tests: PASS, 4 tests.
+- Provider secret-boundary scan: PASS.
+- Android notification/network configuration idempotence: PASS.
+- Local APK build: blocked by the runner's missing Android SDK (`[!] No Android
+  SDK found`); GitHub Actions remains the authoritative Android build environment.

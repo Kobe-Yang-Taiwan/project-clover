@@ -23,3 +23,8 @@ Unknown is better than plausible-looking wrong data.
 
 Founder approved Hybrid Local-first on 2026-08-16. Cloud vision is opt-in for the
 current selected image or required scanned pages only. Native PDFs stay local.
+
+Founder selected paid Google Gemini Developer API `gemini-3.6-flash` for the first
+real-device benchmark. The decision tests whether product-region vision materially
+improves FamilyMart/PX Mart recall without recreating V0.15 false positives; it does
+not authorize cloud processing of native Costco PDFs or other App data.

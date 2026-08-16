@@ -41,6 +41,13 @@ abstract class CloudVisionProvider {
   Future<CloudVisionResult> analyze(VisionAsset asset);
 }
 
+class CloudVisionProviderFactory {
+  const CloudVisionProviderFactory._();
+
+  static CloudVisionProvider fromEnvironment({http.Client? client}) =>
+      GeminiCloudVisionProvider.fromEnvironment(client: client);
+}
+
 class DisabledCloudVisionProvider implements CloudVisionProvider {
   const DisabledCloudVisionProvider();
 
@@ -177,6 +184,7 @@ class HttpCloudVisionProvider implements CloudVisionProvider {
     }
 
     final decoded = _decodeObject(response.body);
+    validateResponseMetadata(decoded);
     final productValues = decoded['products'];
     if (productValues is! List<Object?>) {
       throw const CloudVisionUnavailableException('invalid_cloud_schema');
@@ -192,6 +200,9 @@ class HttpCloudVisionProvider implements CloudVisionProvider {
       'usage',
       'estimated_cost_usd',
     ]);
+    final inputTokens = _integerAt(decoded, const ['usage', 'input_tokens']);
+    final outputTokens = _integerAt(decoded, const ['usage', 'output_tokens']);
+    final totalTokens = _integerAt(decoded, const ['usage', 'total_tokens']);
     return CloudVisionResult(
       products: products,
       usage: CloudProcessingUsage(
@@ -199,9 +210,15 @@ class HttpCloudVisionProvider implements CloudVisionProvider {
         requestCount: 1,
         transmittedBytes: asset.bytes.length,
         estimatedCostUsd: serverCost?.toDouble() ?? estimatedCostPerRequestUsd,
+        inputTokenCount: inputTokens ?? 0,
+        outputTokenCount: outputTokens ?? 0,
+        totalTokenCount:
+            totalTokens ?? (inputTokens ?? 0) + (outputTokens ?? 0),
       ),
     );
   }
+
+  void validateResponseMetadata(Map<String, Object?> response) {}
 
   Map<String, Object?> _decodeObject(String body) {
     try {
@@ -218,14 +235,20 @@ class HttpCloudVisionProvider implements CloudVisionProvider {
     VisionAsset asset,
     int index,
   ) {
-    final regionId = _cleanString(json['region_id']);
+    final regionId =
+        _cleanString(json['product_region_id']) ??
+        _cleanString(json['region_id']);
     if (regionId == null) return null;
     final productName = _stringField(json['product_name'], asset, regionId);
     final regionEvidence = _evidence(json['region_evidence'], asset, regionId);
     if (productName == null || regionEvidence == null) return null;
 
     final originalPrice = _intField(json['original_price'], asset, regionId);
-    final promotionalPrice = _intField(json['promo_price'], asset, regionId);
+    final promotionalPrice = _intField(
+      json['promotional_price'] ?? json['promo_price'],
+      asset,
+      regionId,
+    );
     final discount = _intField(json['discount_amount'], asset, regionId);
     return ReconstructedProduct(
       regionId: regionId,
@@ -247,10 +270,24 @@ class HttpCloudVisionProvider implements CloudVisionProvider {
         asset,
         regionId,
       ),
-      category: _stringField(json['category'], asset, regionId),
+      category: _stringField(
+        json['category_hint'] ?? json['category'],
+        asset,
+        regionId,
+      ),
       notes: _stringField(json['notes'], asset, regionId),
       regionEvidence: regionEvidence,
+      uncertainFields: _stringList(json['uncertain_fields']),
     );
+  }
+
+  List<String> _stringList(Object? value) {
+    if (value is! List<Object?>) return const [];
+    return value
+        .map(_cleanString)
+        .whereType<String>()
+        .toSet()
+        .toList(growable: false);
   }
 
   EvidencedValue<String>? _stringField(
@@ -393,7 +430,69 @@ class HttpCloudVisionProvider implements CloudVisionProvider {
     return current is num ? current : null;
   }
 
+  int? _integerAt(Map<String, Object?> value, List<String> path) {
+    final result = _numberAt(value, path);
+    if (result == null || result < 0 || result % 1 != 0) return null;
+    return result.toInt();
+  }
+
   void dispose() => _client.close();
+}
+
+/// Founder-approved adapter for the Clover-controlled Gemini proxy. The
+/// upstream API key remains on the proxy; Android receives only canonical
+/// Clover JSON and never depends on Gemini SDK-specific response types.
+class GeminiCloudVisionProvider extends HttpCloudVisionProvider {
+  GeminiCloudVisionProvider({
+    required super.endpoint,
+    required super.privacyDisclosure,
+    required this.paidServiceConfirmed,
+    super.bearerToken,
+    super.maxAssetBytes,
+    super.requestTimeout,
+    super.estimatedCostPerRequestUsd,
+    super.client,
+  }) : super(providerName: providerIdentity);
+
+  factory GeminiCloudVisionProvider.fromEnvironment({http.Client? client}) {
+    const endpoint = String.fromEnvironment('CLOVER_VISION_ENDPOINT');
+    const token = String.fromEnvironment('CLOVER_VISION_ACCESS_TOKEN');
+    const disclosure = String.fromEnvironment(
+      'CLOVER_VISION_PRIVACY_DISCLOSURE',
+      defaultValue: defaultPrivacyDisclosure,
+    );
+    const paid = bool.fromEnvironment('CLOVER_GEMINI_PAID_SERVICE');
+    return GeminiCloudVisionProvider(
+      endpoint: endpoint,
+      bearerToken: token,
+      privacyDisclosure: disclosure,
+      paidServiceConfirmed: paid,
+      client: client,
+    );
+  }
+
+  static const model = 'gemini-3.6-flash';
+  static const providerIdentity = 'Google Gemini Developer API / $model';
+  static const defaultPrivacyDisclosure =
+      '使用 Google Gemini Developer API 付費服務（$model）。Google 依付費服務條款'
+      '不使用提示、圖片或回應改善其產品，但會為防止濫用而有限期保留資料；一般付費服務'
+      '並非零資料保留。資料以 HTTPS 傳送，Clover proxy 不保存圖片或完整模型輸入輸出。';
+
+  final bool paidServiceConfirmed;
+
+  @override
+  bool get isConfigured => paidServiceConfirmed && super.isConfigured;
+
+  @override
+  void validateResponseMetadata(Map<String, Object?> response) {
+    if (response['provider'] != 'google-gemini-developer-api' ||
+        response['model'] != model ||
+        response['service_mode'] != 'paid') {
+      throw const CloudVisionUnavailableException(
+        'gemini_provider_identity_mismatch',
+      );
+    }
+  }
 }
 
 class CloudVisionUnavailableException implements Exception {

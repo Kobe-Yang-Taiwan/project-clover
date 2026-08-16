@@ -41,6 +41,7 @@ abstract class SourceAdaptiveCouponImportService {
   Future<SourceAdaptiveImportResult> analyzePdf(
     String path, {
     required bool allowCloudProcessing,
+    Future<bool> Function(int pageNumber)? requestCloudPageConsent,
     required void Function(ImportProgress progress) onProgress,
     required bool Function() isCancelled,
   });
@@ -58,7 +59,7 @@ class LocalCouponImportService
   }) : _recognizer =
            recognizer ?? TextRecognizer(script: TextRecognitionScript.chinese),
        _cloudVisionProvider =
-           cloudVisionProvider ?? HttpCloudVisionProvider.fromEnvironment(),
+           cloudVisionProvider ?? CloudVisionProviderFactory.fromEnvironment(),
        _adapters = adapters,
        _sourceRouter = sourceRouter,
        _understanding = understanding;
@@ -241,6 +242,7 @@ class LocalCouponImportService
   Future<SourceAdaptiveImportResult> analyzePdf(
     String path, {
     required bool allowCloudProcessing,
+    Future<bool> Function(int pageNumber)? requestCloudPageConsent,
     required void Function(ImportProgress progress) onProgress,
     required bool Function() isCancelled,
   }) async {
@@ -253,6 +255,7 @@ class LocalCouponImportService
     final products = <ReconstructedProduct>[];
     var usage = const CloudProcessingUsage();
     var localFallbackUsed = false;
+    var cloudWasDeclined = false;
     final operationId = DateTime.now().microsecondsSinceEpoch;
     try {
       document = await PdfDocument.openFile(path);
@@ -269,9 +272,13 @@ class LocalCouponImportService
           );
           temporaryFiles.add(temporary);
           await temporary.writeAsBytes(rendered, flush: true);
-          if (allowCloudProcessing &&
+          final pageConsent =
+              allowCloudProcessing &&
               cloudVisionAvailable &&
-              rendered.length <= maxCloudAssetBytes) {
+              rendered.length <= maxCloudAssetBytes &&
+              (requestCloudPageConsent == null ||
+                  await requestCloudPageConsent(page.pageNumber));
+          if (pageConsent) {
             try {
               final result = await _cloudVisionProvider.analyze(
                 VisionAsset(
@@ -317,6 +324,11 @@ class LocalCouponImportService
               );
             }
           } else {
+            if (allowCloudProcessing &&
+                cloudVisionAvailable &&
+                rendered.length <= maxCloudAssetBytes) {
+              cloudWasDeclined = true;
+            }
             localFallbackUsed = true;
             pages.add(
               await _localOcr(
@@ -339,9 +351,10 @@ class LocalCouponImportService
         products: products,
         cloudUsage: usage,
         cloudWasDeclined:
-            plan.requiresVision &&
-            cloudVisionAvailable &&
-            !allowCloudProcessing,
+            cloudWasDeclined ||
+            (plan.requiresVision &&
+                cloudVisionAvailable &&
+                !allowCloudProcessing),
         localFallbackUsed: localFallbackUsed,
       );
     } on ImportCancelledException {

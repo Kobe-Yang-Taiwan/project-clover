@@ -15,6 +15,10 @@ Project Clover reconstructs product promotions, not OCR fragments.
 
 Guessing is not a fourth extraction method.
 
+Cloud model output is also evidence, not truth. Provider-specific responses must be
+translated at the proxy/provider boundary; the product model, deterministic
+validation and persistence gate remain provider-independent.
+
 ## Product ownership
 
 One product card owns its name, brand, model, specification, item number, prices

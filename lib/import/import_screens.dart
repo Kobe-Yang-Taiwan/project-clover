@@ -59,22 +59,22 @@ Future<bool> _requestCloudConsent(
     context: context,
     barrierDismissible: false,
     builder: (context) => AlertDialog(
-      title: const Text('是否使用雲端視覺辨識？'),
+      title: const Text('AI 智慧辨識'),
       content: Text(
-        '只會傳送$assetDescription，不會傳送已儲存優惠、提醒、App 資料庫、'
-        '使用歷史或其他檔案。\n\n$disclosure\n\n'
+        '為提高複雜廣告的辨識準確度，$assetDescription將傳送至 AI 服務進行分析。\n\n'
+        '已儲存的優惠券、提醒及其他 App 資料不會上傳。\n\n$disclosure\n\n'
         '雲端結果仍會經過欄位證據與規則驗證，不會直接寫入優惠資料庫。',
       ),
       actions: [
         TextButton(
           key: const Key('decline-cloud-processing'),
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('只用本機'),
+          child: const Text('取消'),
         ),
         FilledButton(
           key: const Key('accept-cloud-processing'),
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('同意本次傳送'),
+          child: const Text('同意並開始辨識'),
         ),
       ],
     ),
@@ -216,19 +216,20 @@ class _PdfImportScreenState extends State<PdfImportScreen> {
           case final SourceAdaptiveCouponImportService adaptive) {
         final plan = await adaptive.inspectPdf(widget.path);
         if (!mounted || cancelled) return;
-        final allowCloud = plan.requiresVision && adaptive.cloudVisionAvailable
-            ? await _requestCloudConsent(
-                context,
-                assetDescription:
-                    '掃描 PDF 中需要視覺分析的 ${plan.visionPages.length} 頁'
-                    '（第 ${plan.visionPages.join('、')} 頁）',
-                disclosure: adaptive.cloudVisionDisclosure,
-              )
-            : false;
-        if (!mounted || cancelled) return;
+        final allowCloud = plan.requiresVision && adaptive.cloudVisionAvailable;
         adaptiveResult = await adaptive.analyzePdf(
           widget.path,
           allowCloudProcessing: allowCloud,
+          requestCloudPageConsent: allowCloud
+              ? (pageNumber) async {
+                  if (!mounted || cancelled) return false;
+                  return _requestCloudConsent(
+                    context,
+                    assetDescription: '掃描 PDF 中實際需要分析的第 $pageNumber 頁',
+                    disclosure: adaptive.cloudVisionDisclosure,
+                  );
+                }
+              : null,
           onProgress: (value) {
             if (mounted) setState(() => progress = value);
           },
@@ -996,8 +997,11 @@ String? _processingNotice(SourceAdaptiveImportResult? result) {
     final cost = result.cloudUsage.estimatedCostUsd > 0
         ? '；估計成本 US\$${result.cloudUsage.estimatedCostUsd.toStringAsFixed(4)}'
         : '';
+    final tokens = result.cloudUsage.totalTokenCount > 0
+        ? '；Token ${result.cloudUsage.totalTokenCount}'
+        : '';
     return '本次經同意使用雲端視覺 ${result.cloudUsage.requestCount} 次，'
-        '傳送 ${(result.cloudUsage.transmittedBytes / 1024).ceil()} KB$cost。';
+        '傳送 ${(result.cloudUsage.transmittedBytes / 1024).ceil()} KB$tokens$cost。';
   }
   if (result.cloudWasDeclined) {
     return '你已選擇只用本機處理；多商品圖片或掃描頁的辨識效果可能較低。';

@@ -39,6 +39,9 @@
     "cross_product_contamination": null,
     "review_burden": null,
     "cloud_requests_used": null,
+    "cloud_input_tokens": null,
+    "cloud_output_tokens": null,
+    "cloud_total_tokens": null,
     "estimated_processing_cost_usd": null
   }
 }
