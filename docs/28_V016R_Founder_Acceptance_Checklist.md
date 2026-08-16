@@ -1,7 +1,7 @@
 # V0.16R / 0.16.1 Founder Android Acceptance Checklist
 
 Test build: `0.16.1 (Build 18)`
-State: LOCAL QA PASS — Build 18 CI/Founder APK evidence pending
+State: STANDARD CI PASS — provider-enabled Founder APK configuration pending
 
 ## Privacy and routing
 
@@ -56,7 +56,7 @@ State: LOCAL QA PASS — Build 18 CI/Founder APK evidence pending
 - [x] Android Build 17 debug APK builds in GitHub Actions run #91.
 - [x] Build 18 local format/analyze and 123 Flutter tests pass.
 - [x] Build 18 proxy privacy/schema suite passes (4 tests); secret-boundary scan passes.
-- [ ] Standard Build 18 Android APK builds in GitHub Actions.
+- [x] Standard Build 18 Android APK builds in GitHub Actions run #93 (artifact `9260715239`).
 - [ ] Provider-enabled Build 18 Founder APK builds with deployed HTTPS proxy config.
 - [ ] Android APK installs and launches on Founder device.
 - [ ] Manual entry, storage, backup/restore, reminder and earlier import flows pass.

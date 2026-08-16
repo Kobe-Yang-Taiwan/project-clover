@@ -35,3 +35,8 @@ Local format, analysis and 120 Flutter tests pass. The local runner has no Andro
 SDK; GitHub Actions run #91 is the authoritative successful Build 17 Android debug
 APK result (artifact `9260093101`). Founder Android Costco/PX Mart/FamilyMart
 reruns remain mandatory.
+
+Build 18 standard Android CI passed in run #93. Artifact `9260715239` is intentionally
+cloud-disabled; it validates regression/build health but cannot perform the Gemini
+Golden Dataset test. A provider-enabled Founder APK must be built by the protected
+workflow after the Clover proxy is deployed and configured.

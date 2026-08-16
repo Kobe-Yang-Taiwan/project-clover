@@ -1,6 +1,6 @@
 # Development Progress — V0.16R / 0.16.1
 
-State: FOUNDER_TEST
+State: BLOCKED — provider-enabled Founder APK configuration required
 
 ## Root causes verified
 
@@ -76,3 +76,10 @@ workflow execute; previous Build 17 evidence remains historical and is not relab
 - Android notification/network configuration idempotence: PASS.
 - Local APK build: blocked by the runner's missing Android SDK (`[!] No Android
   SDK found`); GitHub Actions remains the authoritative Android build environment.
+- GitHub Actions run #93: PASS. Proxy tests, secret scan, format, analyze, 123
+  Flutter tests, Android Build 18 debug APK and artifact upload all succeeded.
+- Standard cloud-disabled APK artifact: `9260715239`, SHA-256
+  `1e8f51f31fc578c9f933dbd7f4a3951c90bcd21af783d09af6864d5e3842e7f2`.
+- Provider-enabled Founder APK remains blocked until the paid Gemini project key is
+  installed only on a deployed Clover proxy and its HTTPS endpoint/short-lived
+  proxy token are supplied to the protected Founder workflow.

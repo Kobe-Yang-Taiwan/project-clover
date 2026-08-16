@@ -13,7 +13,9 @@ _Last updated: 2026-08-16_
   Costco fields remained polluted/mixed.
 - V0.16R privacy architecture: Hybrid Local-first approved 2026-08-16.
 - Founder Test provider: paid Google Gemini Developer API `gemini-3.6-flash`
-  through the Clover proxy; provider-enabled Build 18 pending secure configuration.
+  through the Clover proxy; provider-enabled Build 18 blocked on secure proxy
+  deployment/configuration.
+- Build 18 standard CI: run #93 PASS; cloud-disabled artifact `9260715239`.
 - V0.16R CI/build: run #91 PASS; Android Build 17 artifact `9260093101`.
 - Founder Acceptance: pending V0.16R Costco/PX Mart/FamilyMart rerun.
 
@@ -64,10 +66,10 @@ _Last updated: 2026-08-16_
 | G1 | Repo/worktree inspection | PASS |
 | G2 | Implementation | PASS — Gemini Founder integration |
 | G3 | Local QA | PASS — analyze, 123 Flutter + 4 proxy tests |
-| G4 | Commit / integration | PENDING |
+| G4 | Commit / integration | PASS — remote fast-forward, force=false |
 | G5 | Release authorization | PASS |
-| G6 | GitHub CI + Android APK | Build 17 PASS; Build 18 PENDING |
-| G7 | Founder Android Acceptance | READY / PENDING REAL METRICS |
+| G6 | GitHub CI + Android APK | Standard Build 18 PASS; Founder APK BLOCKED ON PROXY CONFIG |
+| G7 | Founder Android Acceptance | BLOCKED UNTIL PROVIDER APK EXISTS |
 | G8 | Accepted / Release-ready | NOT STARTED |
 
 ## Current Acceptance Work
