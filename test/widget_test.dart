@@ -223,6 +223,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('知道了'));
     await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await precacheImage(
+        FileImage(image),
+        tester.element(find.byType(BatchReviewScreen)),
+      );
+    });
     await tester.tap(find.byKey(const Key('recover-missing-product')));
     await tester.pumpAndSettle();
     await tester.tapAt(
