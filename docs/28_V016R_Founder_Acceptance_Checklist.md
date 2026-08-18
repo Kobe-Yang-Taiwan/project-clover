@@ -1,7 +1,7 @@
 # V0.16R / 0.16.1 Founder Android Acceptance Checklist
 
 Test build: `0.16.1 (Build 19)`
-State: IMPLEMENTING — Local Image POC QA/CI pending
+State: FOUNDER_TEST — Build 19 engineering gate passed; device evidence pending
 
 ## Local Image POC gate
 
@@ -76,7 +76,9 @@ State: IMPLEMENTING — Local Image POC QA/CI pending
 - [ ] Provider-enabled Build 18 Founder APK builds with deployed HTTPS proxy config.
 - [ ] Android APK installs and launches on Founder device.
 - [ ] Manual entry, storage, backup/restore, reminder and earlier import flows pass.
-- [ ] Build 19 format/analyze/full tests pass.
-- [ ] Build 19 standard Android APK builds in GitHub Actions.
+- [x] Build 19 format/analyze/full tests pass (131/131, Actions run #99).
+- [x] Build 19 standard Android APK builds in GitHub Actions (artifact
+  `9336905618`; APK SHA-256
+  `a2178f0708ec267ecbe8ffced207989bb79df9f067df6ea520b0e625dad12096`).
 
 Do not mark accepted if any P0 item fails. Do not merge `main`.

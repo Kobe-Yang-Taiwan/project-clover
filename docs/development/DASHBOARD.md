@@ -1,6 +1,6 @@
 # Project Clover Development Dashboard
 
-_Last updated: 2026-08-16_
+_Last updated: 2026-08-18_
 
 ## Executive Status
 
@@ -8,7 +8,7 @@ _Last updated: 2026-08-16_
 - Current state: FOUNDER_TEST
 - Development branch: `agent/flutter-prototype-v0`
 - Draft PR: #1 (Open, Draft, not merged)
-- V0.16R CI evidence head: `7d5f296e93f212b7a6ebd1e3beff97d4bec8a5bc`
+- V0.16R Local Image POC head: `306f835633884ffe73f2bdaea9bb76df1e68e655`
 - V0.16 Founder Acceptance: FAILED — real images had severe false negatives and
   Costco fields remained polluted/mixed.
 - V0.16R privacy architecture: Hybrid Local-first approved 2026-08-16.
@@ -16,6 +16,8 @@ _Last updated: 2026-08-16_
   through the Clover proxy; provider-enabled Build 18 blocked on secure proxy
   deployment/configuration.
 - Build 18 standard CI: run #93 PASS; cloud-disabled artifact `9260715239`.
+- Build 19 Local Image POC CI: run #99 PASS; 131/131 Flutter tests; Android
+  artifact `9336905618`.
 - V0.16R CI/build: run #91 PASS; Android Build 17 artifact `9260093101`.
 - Founder Acceptance: pending V0.16R Costco/PX Mart/FamilyMart rerun.
 
@@ -64,12 +66,12 @@ _Last updated: 2026-08-16_
 |---|---|---|
 | G0 | Approved scope/spec | PASS |
 | G1 | Repo/worktree inspection | PASS |
-| G2 | Implementation | PASS — Gemini Founder integration |
-| G3 | Local QA | PASS — analyze, 123 Flutter + 4 proxy tests |
+| G2 | Implementation | PASS — local product-region POC and tap recovery |
+| G3 | QA | PASS — CI analyze, 131 Flutter + 4 local proxy tests |
 | G4 | Commit / integration | PASS — remote fast-forward, force=false |
 | G5 | Release authorization | PASS |
-| G6 | GitHub CI + Android APK | Standard Build 18 PASS; Founder APK BLOCKED ON PROXY CONFIG |
-| G7 | Founder Android Acceptance | BLOCKED UNTIL PROVIDER APK EXISTS |
+| G6 | GitHub CI + Android APK | Build 19 run #99 PASS; artifact 9336905618 |
+| G7 | Founder Android Acceptance | PENDING HASH-MATCHED REAL-ASSET RUN |
 | G8 | Accepted / Release-ready | NOT STARTED |
 
 ## Current Acceptance Work

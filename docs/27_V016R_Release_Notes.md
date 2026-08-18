@@ -1,6 +1,6 @@
 # Project Clover V0.16R / 0.16.1 Release Notes
 
-Status: IMPLEMENTING Local Image POC; not Founder accepted.
+Status: FOUNDER_TEST; Build 19 engineering QA passed, not Founder accepted.
 
 Build 19 pivots the standard promotional-image path to local multi-signal region
 proposal, independent crop OCR and one-tap missing-product recovery. Normal image
@@ -46,5 +46,12 @@ cloud-disabled; it validates regression/build health but cannot perform the Gemi
 Golden Dataset test. A provider-enabled Founder APK must be built by the protected
 workflow after the Clover proxy is deployed and configured.
 
-Build 19 QA/CI/APK and real-device POC metrics are recorded only after execution;
-Build 18 evidence above remains historical and is not relabelled.
+Build 19 GitHub Actions run #99 passed format, static analysis, all 131 Flutter
+tests and Android debug APK build on commit `306f835633884ffe73f2bdaea9bb76df1e68e655`.
+Artifact `9336905618` contains Build 19; the extracted APK SHA-256 is
+`a2178f0708ec267ecbe8ffced207989bb79df9f067df6ea520b0e625dad12096`.
+
+This proves engineering regression/build health only. Costco, PX Mart and
+FamilyMart real-device metrics remain blank until the hash-matched original assets
+are run by the Founder. No real-world recall, precision or review-burden success is
+claimed from authored regression fixtures.
