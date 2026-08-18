@@ -836,13 +836,17 @@ class CouponParser {
 
   bool _sameProduct(CouponCandidate a, CouponCandidate b) {
     if (a.sourcePage != b.sourcePage) return false;
+    // An ITEM number is a retailer-owned product identity. Matching explicit
+    // values may safely join complementary fragments (for example, sale and
+    // original-price blocks) even when segmentation emitted two regions.
+    // A missing ITEM never grants permission to cross a region boundary.
+    if (a.itemNumber.isNotEmpty && b.itemNumber.isNotEmpty) {
+      return a.itemNumber == b.itemNumber;
+    }
     if (a.sourceRegionId.isNotEmpty &&
         b.sourceRegionId.isNotEmpty &&
         a.sourceRegionId != b.sourceRegionId) {
       return false;
-    }
-    if (a.itemNumber.isNotEmpty && b.itemNumber.isNotEmpty) {
-      return a.itemNumber == b.itemNumber;
     }
     if (a.model.isNotEmpty && b.model.isNotEmpty) {
       return a.model.toLowerCase() == b.model.toLowerCase() &&
