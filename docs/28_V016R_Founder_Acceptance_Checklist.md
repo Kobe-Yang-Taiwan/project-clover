@@ -1,7 +1,18 @@
 # V0.16R / 0.16.1 Founder Android Acceptance Checklist
 
-Test build: `0.16.1 (Build 18)`
-State: STANDARD CI PASS — provider-enabled Founder APK configuration pending
+Test build: `0.16.1 (Build 19)`
+State: IMPLEMENTING — Local Image POC QA/CI pending
+
+## Local Image POC gate
+
+- [ ] FamilyMart automatic correct regions >= 7/8.
+- [ ] PX Mart automatic correct regions >= 11/12.
+- [ ] A missed product is recovered with approximately one tap.
+- [ ] Recovered product is OCRed/reconstructed without normal manual field typing.
+- [ ] No-Typing Import Rate >= 95% after recovery.
+- [ ] Standard image path records 0 cloud requests and approximately US$0
+  recurring Founder inference cost.
+- [ ] No major cross-product contamination or false-candidate explosion.
 
 ## Privacy and routing
 
@@ -49,6 +60,11 @@ State: STANDARD CI PASS — provider-enabled Founder APK configuration pending
 - Review Burden
 - Cloud requests and estimated cost
 - Cloud input/output/total token usage
+- Proposed Product Region Count
+- Fabricated Field Count
+- No-Typing Import Rate
+- Recovery Action Count and Manual Text Entry Count
+- Median and P95 processing time
 
 ## Engineering regression
 
@@ -60,5 +76,7 @@ State: STANDARD CI PASS — provider-enabled Founder APK configuration pending
 - [ ] Provider-enabled Build 18 Founder APK builds with deployed HTTPS proxy config.
 - [ ] Android APK installs and launches on Founder device.
 - [ ] Manual entry, storage, backup/restore, reminder and earlier import flows pass.
+- [ ] Build 19 format/analyze/full tests pass.
+- [ ] Build 19 standard Android APK builds in GitHub Actions.
 
 Do not mark accepted if any P0 item fails. Do not merge `main`.

@@ -16,7 +16,7 @@
     "bottom disclaimer and navigation"
   ],
   "known_v016_result": {"detected_product_count": 1, "recall": 0.125},
-  "maximum_cloud_requests": 1,
+  "maximum_cloud_requests": 0,
   "release_gate": "blocked_until_original_asset_is_rerun_on_founder_android",
   "acceptance_measurement": {
     "status": "pending_original_asset_configured_provider_and_founder_android",
@@ -33,6 +33,13 @@
     "cloud_input_tokens": null,
     "cloud_output_tokens": null,
     "cloud_total_tokens": null,
-    "estimated_processing_cost_usd": null
+    "estimated_processing_cost_usd": null,
+    "proposed_product_region_count": null,
+    "fabricated_field_count": null,
+    "no_typing_import_rate": null,
+    "recovery_action_count": null,
+    "manual_text_entry_count": null,
+    "median_processing_milliseconds": null,
+    "p95_processing_milliseconds": null
   }
 }

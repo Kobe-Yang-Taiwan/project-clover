@@ -1,6 +1,23 @@
 # Development Progress — V0.16R / 0.16.1
 
-State: BLOCKED — provider-enabled Founder APK configuration required
+State: IMPLEMENTING — Local Image Import Architecture POC
+
+## Local Image POC — 2026-08-18
+
+- [x] Standard promotional-image path no longer requests or invokes cloud vision.
+- [x] OCR coordinates normalize against original image dimensions.
+- [x] Local embedded/standalone price, product-text, repeated-grid, spatial and
+  retailer hints propose independent regions.
+- [x] Proposed regions are cropped and OCRed independently.
+- [x] Crop coordinates map back to immutable source region ownership.
+- [x] One-tap missing-product recovery performs local crop OCR and reconstruction.
+- [x] Golden manifests reserve no-typing, recovery, fabrication and performance
+  measurements and require zero cloud calls for PX Mart/FamilyMart.
+- [ ] Local analyze/full tests and Build 19 CI evidence.
+- [ ] Hash-matched Founder Android FamilyMart/PX Mart measurements.
+
+No real-world POC status is claimed before the original assets run on Android.
+Authored 2×4 and 3×4 coordinates are regression coverage, not acceptance data.
 
 ## Root causes verified
 

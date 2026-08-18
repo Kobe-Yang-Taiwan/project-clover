@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.1+19 — Local Image Import Architecture POC
+
+- 標準促銷圖片改為本機多訊號 region proposal，不再要求 Cloud Vision。
+- OCR 座標改以原始圖片尺寸正規化；每個商品區域獨立裁切與 OCR，保留 region ownership。
+- 新增全家 2×4、全聯 3×4 版面提案回歸與跨 region 不合併測試。
+- 新增「少了一個商品？點一下圖片中的商品」一鍵補回流程。
+- Golden Dataset 新增 No-Typing、recovery、fabrication 與效能欄位；真實素材數值仍待 Founder Android。
+- Cloud provider／proxy／privacy code 保留但不由標準圖片流程呼叫；正常路徑 cloud request 與 Founder inference cost 為 0。
+
 ## 0.16.1+18 — Gemini Founder-Test Provider
 
 - 新增 `GeminiCloudVisionProvider`，固定 Founder Test 模型 `gemini-3.6-flash`，且只允許明確確認的 Paid Service。

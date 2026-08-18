@@ -26,6 +26,12 @@ Every manifest reserves the complete acceptance metric schema. Values stay `null
 with a pending status until that exact hashed asset is run on Founder Android;
 pending values must never be presented as zero or as a passing measurement.
 
+V0.16R Local Image POC runs the FamilyMart and PX Mart samples through local
+multi-signal region proposal plus region-by-region OCR. The normal path must
+record zero cloud requests and approximately zero recurring Founder inference
+cost. Automated coordinate fixtures exercise the same region ownership rules,
+but do not replace a hash-matched Founder Android run of the original assets.
+
 Private fixture placement for local evaluation:
 
 `test/golden_dataset/private/<asset file>`

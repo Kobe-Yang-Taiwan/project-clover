@@ -99,6 +99,9 @@ class OcrPageResult {
     this.positionedLines = const [],
     this.extractionMethod = ImportExtractionMethod.localOcr,
     this.structuredRepresentation = '',
+    this.sourceRegionId,
+    this.sourceBounds,
+    this.sharedPositionedLines = const [],
   });
 
   final ImportSourceType sourceType;
@@ -111,6 +114,57 @@ class OcrPageResult {
   final List<OcrTextLine> positionedLines;
   final ImportExtractionMethod extractionMethod;
   final String structuredRepresentation;
+
+  /// Identifies an independently cropped product region. When present,
+  /// document understanding must not regroup this OCR result with neighbours.
+  final String? sourceRegionId;
+  final OcrRegionBounds? sourceBounds;
+  final List<OcrTextLine> sharedPositionedLines;
+}
+
+enum LocalRegionSignal {
+  priceAnchor,
+  productText,
+  repeatedGrid,
+  spatialSeparation,
+  retailerHint,
+  userTap,
+}
+
+class ProposedImageRegion {
+  const ProposedImageRegion({
+    required this.id,
+    required this.bounds,
+    required this.signals,
+    required this.confidence,
+  });
+
+  final String id;
+  final OcrRegionBounds bounds;
+  final Set<LocalRegionSignal> signals;
+  final double confidence;
+
+  bool contains(double x, double y) =>
+      x >= bounds.left &&
+      x < bounds.right &&
+      y >= bounds.top &&
+      y < bounds.bottom;
+}
+
+class LocalImageProcessingMetrics {
+  const LocalImageProcessingMetrics({
+    this.proposedRegionCount = 0,
+    this.regionOcrCount = 0,
+    this.recoveryActionCount = 0,
+    this.manualTextEntryCount = 0,
+    this.processingDuration = Duration.zero,
+  });
+
+  final int proposedRegionCount;
+  final int regionOcrCount;
+  final int recoveryActionCount;
+  final int manualTextEntryCount;
+  final Duration processingDuration;
 }
 
 class FieldEvidence {
@@ -254,6 +308,8 @@ class SourceAdaptiveImportResult {
     this.cloudUsage = const CloudProcessingUsage(),
     this.cloudWasDeclined = false,
     this.localFallbackUsed = false,
+    this.merchantHint = '',
+    this.localImageMetrics = const LocalImageProcessingMetrics(),
   });
 
   final ImportRoute route;
@@ -262,6 +318,8 @@ class SourceAdaptiveImportResult {
   final CloudProcessingUsage cloudUsage;
   final bool cloudWasDeclined;
   final bool localFallbackUsed;
+  final String merchantHint;
+  final LocalImageProcessingMetrics localImageMetrics;
 }
 
 class PdfSourcePlan {
@@ -475,6 +533,7 @@ class ImportQualityReport {
     this.duplicateCandidateCount = 0,
     this.crossCellContaminationCount = 0,
     this.cloudUsage = const CloudProcessingUsage(),
+    this.localImageMetrics = const LocalImageProcessingMetrics(),
   });
 
   final int rawDetectedRegions;
@@ -493,6 +552,7 @@ class ImportQualityReport {
   final int duplicateCandidateCount;
   final int crossCellContaminationCount;
   final CloudProcessingUsage cloudUsage;
+  final LocalImageProcessingMetrics localImageMetrics;
 
   int get generatedCandidateCount => finalVisibleCandidateCount;
   double get reviewBurden =>
@@ -519,6 +579,10 @@ class ImportQualityReport {
     'cloud_input_tokens': cloudUsage.inputTokenCount,
     'cloud_output_tokens': cloudUsage.outputTokenCount,
     'cloud_total_tokens': cloudUsage.totalTokenCount,
+    'proposed_product_region_count': localImageMetrics.proposedRegionCount,
+    'region_ocr_count': localImageMetrics.regionOcrCount,
+    'user_recovery_actions': localImageMetrics.recoveryActionCount,
+    'manual_text_entry_count': localImageMetrics.manualTextEntryCount,
   };
 }
 
@@ -548,6 +612,15 @@ class LabeledImportQualityMetrics {
     required this.crossCellContaminationCount,
     required this.correctRequiredFieldCount,
     required this.evaluatedRequiredFieldCount,
+    this.proposedProductRegionCount = 0,
+    this.fabricatedFieldCount = 0,
+    this.noTypingProductCount = 0,
+    this.recoveryActionCount = 0,
+    this.manualTextEntryCount = 0,
+    this.medianProcessingMilliseconds = 0,
+    this.p95ProcessingMilliseconds = 0,
+    this.cloudRequestCount = 0,
+    this.estimatedProcessingCostUsd = 0,
   });
 
   final int actualProductCount;
@@ -562,6 +635,15 @@ class LabeledImportQualityMetrics {
   final int crossCellContaminationCount;
   final int correctRequiredFieldCount;
   final int evaluatedRequiredFieldCount;
+  final int proposedProductRegionCount;
+  final int fabricatedFieldCount;
+  final int noTypingProductCount;
+  final int recoveryActionCount;
+  final int manualTextEntryCount;
+  final int medianProcessingMilliseconds;
+  final int p95ProcessingMilliseconds;
+  final int cloudRequestCount;
+  final double estimatedProcessingCostUsd;
 
   double get candidatePrecision => generatedCandidateCount == 0
       ? (actualProductCount == 0 ? 1 : 0)
@@ -577,6 +659,8 @@ class LabeledImportQualityMetrics {
   double get reviewBurden => actualProductCount == 0
       ? generatedCandidateCount.toDouble()
       : generatedCandidateCount / actualProductCount;
+  double get noTypingImportRate =>
+      actualProductCount == 0 ? 1 : noTypingProductCount / actualProductCount;
 
   Map<String, Object> toJson() => {
     'actual_product_count': actualProductCount,
@@ -593,6 +677,15 @@ class LabeledImportQualityMetrics {
     'direct_import_count': directImportCount,
     'needs_confirmation_count': needsConfirmationCount,
     'excluded_count': excludedCount,
+    'proposed_product_region_count': proposedProductRegionCount,
+    'fabricated_field_count': fabricatedFieldCount,
+    'no_typing_import_rate': noTypingImportRate,
+    'recovery_action_count': recoveryActionCount,
+    'manual_text_entry_count': manualTextEntryCount,
+    'median_processing_milliseconds': medianProcessingMilliseconds,
+    'p95_processing_milliseconds': p95ProcessingMilliseconds,
+    'cloud_requests_used': cloudRequestCount,
+    'estimated_processing_cost_usd': estimatedProcessingCostUsd,
   };
 }
 

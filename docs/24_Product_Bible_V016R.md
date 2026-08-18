@@ -30,3 +30,16 @@ supports inheritance. A field from another region invalidates the candidate.
 “100% final imported information correctness” means high-confidence import plus
 targeted confirmation plus rejection. It does not mean pretending OCR or a cloud
 model is 100% accurate.
+
+## Core economics principle
+
+Any feature whose recurring Founder infrastructure or inference cost grows
+linearly with free-user usage must not become mandatory in Clover's free/core
+journey without an approved sustainable revenue model. Optional future paid AI
+features are not prohibited.
+
+## Almost-no-typing principle
+
+The preferred image experience is automatic local reconstruction for most
+products, followed by one tap on any missed product so Clover performs the crop,
+OCR and reconstruction. Manual field typing is the fallback, not the target UX.

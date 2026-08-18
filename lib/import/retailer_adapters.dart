@@ -4,6 +4,7 @@ class RetailerAdapter {
     required this.merchant,
     required this.pattern,
     this.usesRepeatedGrid = false,
+    this.expectedImageColumns,
     this.productLabelHints = const [],
     this.sharedCampaignHints = const [],
   });
@@ -12,6 +13,7 @@ class RetailerAdapter {
   final String merchant;
   final RegExp pattern;
   final bool usesRepeatedGrid;
+  final int? expectedImageColumns;
   final List<String> productLabelHints;
   final List<String> sharedCampaignHints;
 
@@ -26,6 +28,7 @@ class RetailerAdapterRegistry {
     merchant: 'Costco 好市多',
     pattern: RegExp(r'costco|好市多', caseSensitive: false),
     usesRepeatedGrid: true,
+    expectedImageColumns: 4,
     productLabelHints: const ['ITEM', '賣場售價', '現省'],
     sharedCampaignHints: const ['優惠期間', '僅限好市多', '線上購物亦有優惠'],
   );
@@ -35,6 +38,7 @@ class RetailerAdapterRegistry {
     merchant: '全聯福利中心',
     pattern: RegExp(r'px\s*mart|全聯(?:福利中心)?', caseSensitive: false),
     usesRepeatedGrid: true,
+    expectedImageColumns: 3,
     productLabelHints: const ['特價', '福利價', '任選'],
     sharedCampaignHints: const ['全聯福利中心', '活動期間', '本期優惠'],
   );
@@ -47,6 +51,7 @@ class RetailerAdapterRegistry {
       caseSensitive: false,
     ),
     usesRepeatedGrid: true,
+    expectedImageColumns: 2,
     productLabelHints: const ['友善食光', '會員價', '任選'],
     sharedCampaignHints: const ['FamilyMart', '全家便利商店', '活動期間'],
   );

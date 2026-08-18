@@ -521,57 +521,54 @@ void main() {
     },
   );
 
-  test(
-    'new coupons inherit persisted reminder defaults without changing existing coupons',
-    () async {
-      final storage = MemoryOfferStorage();
-      final reminderSettings = MemoryReminderDefaultsStorage();
-      final existing = Offer(
-        id: 'existing',
-        name: '現有優惠',
-        expiresAt: DateTime(2026, 9, 30),
-        reminderEnabled: true,
-        reminderDaysBefore: 1,
-        reminderHour: 9,
-      );
-      final store = OfferStore(
-        initialOffers: [existing],
-        storage: storage,
-        reminderDefaultsStorage: reminderSettings,
-      );
+  test('new coupons inherit persisted reminder defaults without changing existing coupons', () async {
+    final storage = MemoryOfferStorage();
+    final reminderSettings = MemoryReminderDefaultsStorage();
+    final existing = Offer(
+      id: 'existing',
+      name: '現有優惠',
+      expiresAt: DateTime(2026, 9, 30),
+      reminderEnabled: true,
+      reminderDaysBefore: 1,
+      reminderHour: 9,
+    );
+    final store = OfferStore(
+      initialOffers: [existing],
+      storage: storage,
+      reminderDefaultsStorage: reminderSettings,
+    );
 
-      await store.setReminderDefaults(
-        const ReminderDefaults(
-          enabled: false,
-          daysBefore: 7,
-          hour: 18,
-          minute: 30,
-        ),
-      );
-      await store.addOffer(name: '新優惠', expiresAt: DateTime(2026, 10, 31));
+    await store.setReminderDefaults(
+      const ReminderDefaults(
+        enabled: false,
+        daysBefore: 7,
+        hour: 18,
+        minute: 30,
+      ),
+    );
+    await store.addOffer(name: '新優惠', expiresAt: DateTime(2026, 10, 31));
 
-      final unchanged = store.allOffers.firstWhere(
-        (offer) => offer.id == 'existing',
-      );
-      final added = store.allOffers.firstWhere((offer) => offer.name == '新優惠');
-      expect(unchanged.reminderEnabled, isTrue);
-      expect(unchanged.reminderDaysBefore, 1);
-      expect(unchanged.reminderHour, 9);
-      expect(added.reminderEnabled, isFalse);
-      expect(added.reminderDaysBefore, 7);
-      expect(added.reminderHour, 18);
-      expect(added.reminderMinute, 30);
+    final unchanged = store.allOffers.firstWhere(
+      (offer) => offer.id == 'existing',
+    );
+    final added = store.allOffers.firstWhere((offer) => offer.name == '新優惠');
+    expect(unchanged.reminderEnabled, isTrue);
+    expect(unchanged.reminderDaysBefore, 1);
+    expect(unchanged.reminderHour, 9);
+    expect(added.reminderEnabled, isFalse);
+    expect(added.reminderDaysBefore, 7);
+    expect(added.reminderHour, 18);
+    expect(added.reminderMinute, 30);
 
-      final reopened = await OfferStore.load(
-        storage: storage,
-        reminderDefaultsStorage: reminderSettings,
-      );
-      expect(reopened.reminderDefaults.enabled, isFalse);
-      expect(reopened.reminderDefaults.daysBefore, 7);
-      expect(reopened.reminderDefaults.hour, 18);
-      expect(reopened.reminderDefaults.minute, 30);
-    },
-  );
+    final reopened = await OfferStore.load(
+      storage: storage,
+      reminderDefaultsStorage: reminderSettings,
+    );
+    expect(reopened.reminderDefaults.enabled, isFalse);
+    expect(reopened.reminderDefaults.daysBefore, 7);
+    expect(reopened.reminderDefaults.hour, 18);
+    expect(reopened.reminderDefaults.minute, 30);
+  });
 
   test(
     'expired cleanup uses strict age boundaries and keeps completed history',

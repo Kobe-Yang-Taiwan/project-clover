@@ -5,9 +5,9 @@
 ```text
 Source Router
 ├ Native-text PDF → local PDF text/fragments/bounds → layout cells
-├ Image-only PDF  → render only required pages → consented vision
-├ Promo image     → consented product-region vision
-└ Local fallback  → OCR evidence → conservative legacy reconstruction
+├ Image-only PDF  → render only required pages → existing scanned-page path
+├ Promo image     → local region proposal → crop OCR → structured regions
+└ Optional cloud  → dormant provider-neutral research infrastructure
 
 All routes → Canonical Product + field evidence → deterministic validation
            → DIRECT_IMPORT / NEEDS_CONFIRMATION / EXCLUDED → review → import
@@ -29,6 +29,25 @@ cross-product contamination.
 
 Cloud output cannot write `Offer` records. It is parsed through a strict schema,
 then processed by the same price/date/product validation and review workflow.
+
+## Local promotional-image POC
+
+The full-image OCR pass proposes geometry; it does not create candidates. The
+proposal engine combines price anchors (including embedded price text), product
+text, repeated row/column structure, spatial separation and retailer layout hints.
+Each proposed region is then cropped and OCRed independently. Coordinates are
+normalized against the original image dimensions rather than the detected text
+extent, and crop OCR coordinates are mapped back into the original source bounds.
+
+`sourceRegionId + sourceBounds` is an ownership boundary. Document understanding
+must not regroup an independently cropped region with adjacent products. A price-
+only crop may be proposed for inspection but deterministic product validation
+still produces zero product candidate.
+
+If a region is missed, the user taps the product once. Clover estimates a bounded
+cell around that point, performs local crop OCR, reconstructs it through the same
+pipeline and adds only a non-duplicate candidate. Standard image import and tap
+recovery make zero cloud requests.
 
 ## Retailer adapters
 

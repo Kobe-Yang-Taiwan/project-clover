@@ -1,6 +1,11 @@
 # Project Clover V0.16R / 0.16.1 Release Notes
 
-Status: FOUNDER_TEST; engineering/CI complete, not Founder accepted.
+Status: IMPLEMENTING Local Image POC; not Founder accepted.
+
+Build 19 pivots the standard promotional-image path to local multi-signal region
+proposal, independent crop OCR and one-tap missing-product recovery. Normal image
+imports make zero cloud requests. Existing Gemini/provider/proxy code remains
+dormant for research/future optional use and has not been deleted or deployed.
 
 Build 18 adds the Founder-approved paid Gemini `gemini-3.6-flash` provider and a
 small Clover-controlled proxy. The standard CI APK stays cloud-disabled; the
@@ -40,3 +45,6 @@ Build 18 standard Android CI passed in run #93. Artifact `9260715239` is intenti
 cloud-disabled; it validates regression/build health but cannot perform the Gemini
 Golden Dataset test. A provider-enabled Founder APK must be built by the protected
 workflow after the Clover proxy is deployed and configured.
+
+Build 19 QA/CI/APK and real-device POC metrics are recorded only after execution;
+Build 18 evidence above remains historical and is not relabelled.

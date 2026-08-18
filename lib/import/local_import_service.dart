@@ -9,6 +9,7 @@ import 'package:pdfrx/pdfrx.dart';
 import 'cloud_vision_provider.dart';
 import 'coupon_import_models.dart';
 import 'document_understanding.dart';
+import 'local_image_region_proposal.dart';
 import 'retailer_adapters.dart';
 import 'source_router.dart';
 
@@ -38,6 +39,12 @@ abstract class SourceAdaptiveCouponImportService {
     required bool allowCloudProcessing,
   });
 
+  Future<SourceAdaptiveImportResult> recoverImageRegion(
+    String path, {
+    required double normalizedX,
+    required double normalizedY,
+  });
+
   Future<SourceAdaptiveImportResult> analyzePdf(
     String path, {
     required bool allowCloudProcessing,
@@ -56,13 +63,16 @@ class LocalCouponImportService
     ImportSourceRouter sourceRouter = const ImportSourceRouter(),
     DocumentUnderstandingPipeline understanding =
         const DocumentUnderstandingPipeline(),
+    LocalImageRegionProposalEngine regionProposal =
+        const LocalImageRegionProposalEngine(),
   }) : _recognizer =
            recognizer ?? TextRecognizer(script: TextRecognitionScript.chinese),
        _cloudVisionProvider =
            cloudVisionProvider ?? CloudVisionProviderFactory.fromEnvironment(),
        _adapters = adapters,
        _sourceRouter = sourceRouter,
-       _understanding = understanding;
+       _understanding = understanding,
+       _regionProposal = regionProposal;
 
   static const maxFileBytes = 30 * 1024 * 1024;
   static const maxCloudAssetBytes = 8 * 1024 * 1024;
@@ -74,7 +84,9 @@ class LocalCouponImportService
   final RetailerAdapterRegistry _adapters;
   final ImportSourceRouter _sourceRouter;
   final DocumentUnderstandingPipeline _understanding;
+  final LocalImageRegionProposalEngine _regionProposal;
   final Map<String, _PdfInspection> _pdfInspectionCache = {};
+  final Map<String, _ImageInspection> _imageInspectionCache = {};
 
   @override
   bool get cloudVisionAvailable => _cloudVisionProvider.isConfigured;
@@ -136,13 +148,40 @@ class LocalCouponImportService
     final operationId = DateTime.now().microsecondsSinceEpoch;
     final local = await recognizeImage(path);
     final adapter = _adapters.resolve(sourceName: path, text: local.text);
+    final proposals = _regionProposal.propose(local, adapter: adapter);
+    final sharedLines = _understanding
+        .understand(local)
+        .sharedBlocks
+        .map((block) => block.line)
+        .toList();
+    _imageInspectionCache.clear();
+    _imageInspectionCache[path] = _ImageInspection(
+      adapter: adapter,
+      regions: proposals,
+      sharedLines: sharedLines,
+    );
     if (!allowCloudProcessing || !cloudVisionAvailable) {
+      final watch = Stopwatch()..start();
+      final regionPages = <OcrPageResult>[];
+      for (final region in proposals) {
+        final page = await _ocrImageRegion(
+          path,
+          region,
+          sharedLines: sharedLines,
+        );
+        if (page.succeeded) regionPages.add(page);
+      }
+      watch.stop();
       return SourceAdaptiveImportResult(
         route: _sourceRouter.forImage().route,
-        pages: [local],
+        pages: regionPages.isEmpty ? [local] : regionPages,
         products: const [],
-        cloudWasDeclined: cloudVisionAvailable && !allowCloudProcessing,
-        localFallbackUsed: true,
+        merchantHint: adapter.merchant,
+        localImageMetrics: LocalImageProcessingMetrics(
+          proposedRegionCount: proposals.length,
+          regionOcrCount: regionPages.length,
+          processingDuration: local.duration + watch.elapsed,
+        ),
       );
     }
 
@@ -174,6 +213,10 @@ class LocalCouponImportService
         pages: [local],
         products: result.products,
         cloudUsage: result.usage,
+        merchantHint: adapter.merchant,
+        localImageMetrics: LocalImageProcessingMetrics(
+          proposedRegionCount: proposals.length,
+        ),
       );
     } on CloudVisionUnavailableException {
       return SourceAdaptiveImportResult(
@@ -185,8 +228,61 @@ class LocalCouponImportService
           failureCount: 1,
         ),
         localFallbackUsed: true,
+        merchantHint: adapter.merchant,
       );
     }
+  }
+
+  @override
+  Future<SourceAdaptiveImportResult> recoverImageRegion(
+    String path, {
+    required double normalizedX,
+    required double normalizedY,
+  }) async {
+    await _validateSize(path);
+    var inspection = _imageInspectionCache[path];
+    if (inspection == null) {
+      final page = await recognizeImage(path);
+      final adapter = _adapters.resolve(sourceName: path, text: page.text);
+      final regions = _regionProposal.propose(page, adapter: adapter);
+      final sharedLines = _understanding
+          .understand(page)
+          .sharedBlocks
+          .map((block) => block.line)
+          .toList();
+      inspection = _ImageInspection(
+        adapter: adapter,
+        regions: regions,
+        sharedLines: sharedLines,
+      );
+      _imageInspectionCache.clear();
+      _imageInspectionCache[path] = inspection;
+    }
+    final region = _regionProposal.recoverAt(
+      x: normalizedX.clamp(0.0, 1.0).toDouble(),
+      y: normalizedY.clamp(0.0, 1.0).toDouble(),
+      existing: inspection.regions,
+      adapter: inspection.adapter,
+    );
+    final watch = Stopwatch()..start();
+    final page = await _ocrImageRegion(
+      path,
+      region,
+      sharedLines: inspection.sharedLines,
+    );
+    watch.stop();
+    return SourceAdaptiveImportResult(
+      route: ImportRoute.promotionalImage,
+      pages: [page],
+      products: const [],
+      merchantHint: inspection.adapter.merchant,
+      localImageMetrics: LocalImageProcessingMetrics(
+        proposedRegionCount: 1,
+        regionOcrCount: page.succeeded ? 1 : 0,
+        recoveryActionCount: 1,
+        processingDuration: watch.elapsed,
+      ),
+    );
   }
 
   @override
@@ -378,9 +474,12 @@ class LocalCouponImportService
     String path, {
     required ImportSourceType sourceType,
     required int? pageNumber,
+    ProposedImageRegion? sourceRegion,
+    List<OcrTextLine> sharedPositionedLines = const [],
   }) async {
     final watch = Stopwatch()..start();
     try {
+      final dimensions = await _imageDimensions(path);
       final recognized = await _recognizer.processImage(
         InputImage.fromFilePath(path),
       );
@@ -393,9 +492,17 @@ class LocalCouponImportService
             .expand((block) => block.lines)
             .map((line) => line.text)
             .toList(),
-        positionedLines: _positionedLines(recognized),
+        positionedLines: _positionedLines(
+          recognized,
+          imageWidth: dimensions.$1,
+          imageHeight: dimensions.$2,
+          sourceBounds: sourceRegion?.bounds,
+        ),
         succeeded: true,
         duration: watch.elapsed,
+        sourceRegionId: sourceRegion?.id,
+        sourceBounds: sourceRegion?.bounds,
+        sharedPositionedLines: sharedPositionedLines,
       );
     } catch (_) {
       watch.stop();
@@ -407,16 +514,119 @@ class LocalCouponImportService
         succeeded: false,
         failureCode: 'ocr_failed',
         duration: watch.elapsed,
+        sourceRegionId: sourceRegion?.id,
+        sourceBounds: sourceRegion?.bounds,
+        sharedPositionedLines: sharedPositionedLines,
       );
+    }
+  }
+
+  Future<OcrPageResult> _ocrImageRegion(
+    String path,
+    ProposedImageRegion region, {
+    required List<OcrTextLine> sharedLines,
+  }) async {
+    final temporary = File(
+      '${Directory.systemTemp.path}/clover-region-'
+      '${DateTime.now().microsecondsSinceEpoch}-${region.id}.png',
+    );
+    try {
+      final bytes = await _cropImage(path, region.bounds);
+      await temporary.writeAsBytes(bytes, flush: true);
+      final page = await _localOcr(
+        temporary.path,
+        sourceType: ImportSourceType.image,
+        pageNumber: null,
+        sourceRegion: region,
+        sharedPositionedLines: sharedLines,
+      );
+      final structured = _understanding
+          .understand(page)
+          .toStructuredMarkdown(pageNumber: 1);
+      return OcrPageResult(
+        sourceType: page.sourceType,
+        pageNumber: page.pageNumber,
+        text: page.text,
+        lines: page.lines,
+        succeeded: page.succeeded,
+        duration: page.duration,
+        failureCode: page.failureCode,
+        positionedLines: page.positionedLines,
+        extractionMethod: page.extractionMethod,
+        structuredRepresentation: structured,
+        sourceRegionId: page.sourceRegionId,
+        sourceBounds: page.sourceBounds,
+        sharedPositionedLines: page.sharedPositionedLines,
+      );
+    } finally {
+      try {
+        if (await temporary.exists()) await temporary.delete();
+      } catch (_) {
+        // Temporary cleanup failure does not affect the import result.
+      }
+    }
+  }
+
+  Future<Uint8List> _cropImage(String path, OcrRegionBounds bounds) async {
+    final bytes = await File(path).readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    try {
+      final frame = await codec.getNextFrame();
+      final source = frame.image;
+      try {
+        final left = (bounds.left * source.width)
+            .floor()
+            .clamp(0, source.width - 1)
+            .toInt();
+        final top = (bounds.top * source.height)
+            .floor()
+            .clamp(0, source.height - 1)
+            .toInt();
+        final right = (bounds.right * source.width)
+            .ceil()
+            .clamp(left + 1, source.width)
+            .toInt();
+        final bottom = (bounds.bottom * source.height)
+            .ceil()
+            .clamp(top + 1, source.height)
+            .toInt();
+        final width = right - left;
+        final height = bottom - top;
+        final recorder = ui.PictureRecorder();
+        final canvas = ui.Canvas(recorder);
+        canvas.drawImageRect(
+          source,
+          ui.Rect.fromLTRB(
+            left.toDouble(),
+            top.toDouble(),
+            right.toDouble(),
+            bottom.toDouble(),
+          ),
+          ui.Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+          ui.Paint(),
+        );
+        final cropped = await recorder.endRecording().toImage(width, height);
+        try {
+          final data = await cropped.toByteData(format: ui.ImageByteFormat.png);
+          if (data == null) throw StateError('crop_encode_failed');
+          return data.buffer.asUint8List();
+        } finally {
+          cropped.dispose();
+        }
+      } finally {
+        source.dispose();
+      }
+    } finally {
+      codec.dispose();
     }
   }
 
   bool _isReliableNativeText(PdfPage page, PdfPageText text) {
     final compact = text.fullText.replaceAll(RegExp(r'\s'), '');
     if (compact.length < 80 || text.fragments.length < 8) return false;
-    final identityCharacters = RegExp(
-      r'[A-Za-z0-9\u4e00-\u9fff]',
-    ).allMatches(compact).length;
+    final identityCharacters = RegExp(r'[A-Za-z0-9\u4e00-\u9fff]')
+        .allMatches(compact)
+        .length;
     if (identityCharacters / compact.length < 0.55) return false;
     final top = text.fragments
         .map((fragment) => fragment.bounds.top)
@@ -504,27 +714,55 @@ class LocalCouponImportService
     }
   }
 
-  List<OcrTextLine> _positionedLines(RecognizedText recognized) {
+  List<OcrTextLine> _positionedLines(
+    RecognizedText recognized, {
+    required double imageWidth,
+    required double imageHeight,
+    OcrRegionBounds? sourceBounds,
+  }) {
     final lines = recognized.blocks.expand((block) => block.lines).toList();
     if (lines.isEmpty) return const [];
-    final width = lines
-        .map((line) => line.boundingBox.right)
-        .reduce((a, b) => a > b ? a : b);
-    final height = lines
-        .map((line) => line.boundingBox.bottom)
-        .reduce((a, b) => a > b ? a : b);
-    if (width <= 0 || height <= 0) return const [];
+    if (imageWidth <= 0 || imageHeight <= 0) return const [];
+    double mapX(double value) {
+      final local = (value / imageWidth).clamp(0, 1).toDouble();
+      if (sourceBounds == null) return local;
+      return sourceBounds.left +
+          local * (sourceBounds.right - sourceBounds.left);
+    }
+
+    double mapY(double value) {
+      final local = (value / imageHeight).clamp(0, 1).toDouble();
+      if (sourceBounds == null) return local;
+      return sourceBounds.top +
+          local * (sourceBounds.bottom - sourceBounds.top);
+    }
+
     return lines
         .map(
           (line) => OcrTextLine(
             text: line.text,
-            left: (line.boundingBox.left / width).clamp(0, 1).toDouble(),
-            top: (line.boundingBox.top / height).clamp(0, 1).toDouble(),
-            right: (line.boundingBox.right / width).clamp(0, 1).toDouble(),
-            bottom: (line.boundingBox.bottom / height).clamp(0, 1).toDouble(),
+            left: mapX(line.boundingBox.left),
+            top: mapY(line.boundingBox.top),
+            right: mapX(line.boundingBox.right),
+            bottom: mapY(line.boundingBox.bottom),
           ),
         )
         .toList();
+  }
+
+  Future<(double, double)> _imageDimensions(String path) async {
+    final bytes = await File(path).readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    try {
+      final frame = await codec.getNextFrame();
+      try {
+        return (frame.image.width.toDouble(), frame.image.height.toDouble());
+      } finally {
+        frame.image.dispose();
+      }
+    } finally {
+      codec.dispose();
+    }
   }
 
   String _imageMimeType(String path) {
@@ -561,4 +799,16 @@ class _PdfInspection {
   final PdfSourcePlan plan;
   final Map<int, OcrPageResult> nativePages;
   final RetailerAdapter adapter;
+}
+
+class _ImageInspection {
+  const _ImageInspection({
+    required this.adapter,
+    required this.regions,
+    required this.sharedLines,
+  });
+
+  final RetailerAdapter adapter;
+  final List<ProposedImageRegion> regions;
+  final List<OcrTextLine> sharedLines;
 }

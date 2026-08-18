@@ -2,6 +2,16 @@
 
 ## V0.16R known limitations
 
+- Local image region proposal currently depends on text/price/grid/spatial signals;
+  it is not a trained product-image detector. The POC must stop and recommend a
+  Founder-approved Phase 2 detector if real FamilyMart <=4/8 or PX Mart <=7/12.
+- Hash-matched FamilyMart/PX Mart source images are not committed to the public
+  repository. Authored layout regressions cannot establish the real POC gate.
+- One-tap recovery estimates a retailer/grid-aligned crop around the tap. Highly
+  irregular overlapping layouts may need another tap or manual entry.
+- Cloud Vision remains preserved but dormant and is not called by the standard
+  promotional-image path.
+
 - Paid Gemini `gemini-3.6-flash` is approved, but the standard APK remains cloud-
   disabled. A provider-enabled Founder APK requires a deployed Clover HTTPS proxy,
   paid-project Gemini secret and protected short-lived proxy token.

@@ -312,6 +312,11 @@ void main() {
       crossCellContaminationCount: 0,
       correctRequiredFieldCount: 78,
       evaluatedRequiredFieldCount: 80,
+      proposedProductRegionCount: 10,
+      noTypingProductCount: 10,
+      recoveryActionCount: 1,
+      manualTextEntryCount: 0,
+      cloudRequestCount: 0,
     );
 
     expect(metrics.candidatePrecision, 1);
@@ -319,6 +324,8 @@ void main() {
     expect(metrics.fieldAccuracy, 0.975);
     expect(metrics.duplicateRate, 0);
     expect(metrics.reviewBurden, 1);
+    expect(metrics.noTypingImportRate, 1);
+    expect(metrics.toJson()['cloud_requests_used'], 0);
   });
 
   test('final validation gate checks promotion and price relationships', () {

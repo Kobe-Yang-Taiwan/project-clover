@@ -42,6 +42,13 @@
     "cloud_input_tokens": null,
     "cloud_output_tokens": null,
     "cloud_total_tokens": null,
-    "estimated_processing_cost_usd": null
+    "estimated_processing_cost_usd": null,
+    "proposed_product_region_count": null,
+    "fabricated_field_count": null,
+    "no_typing_import_rate": null,
+    "recovery_action_count": null,
+    "manual_text_entry_count": null,
+    "median_processing_milliseconds": null,
+    "p95_processing_milliseconds": null
   }
 }

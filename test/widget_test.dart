@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:project_clover/beta_support.dart';
@@ -80,7 +83,7 @@ void main() {
     expect(find.text('今天值得使用'), findsOneWidget);
   });
 
-  testWidgets('cloud vision waits for explicit per-import consent', (
+  testWidgets('standard image import never asks for cloud processing', (
     tester,
   ) async {
     final service = ConsentImportService();
@@ -94,18 +97,12 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.text('AI 智慧辨識'), findsOneWidget);
-    expect(find.text('同意並開始辨識'), findsOneWidget);
-    expect(service.analyzeCalls, 0);
-
-    await tester.tap(find.byKey(const Key('decline-cloud-processing')));
     await tester.pumpAndSettle();
 
+    expect(find.text('AI 智慧辨識'), findsNothing);
     expect(service.analyzeCalls, 1);
     expect(service.lastAllowCloudProcessing, isFalse);
+    expect(find.text('選擇要匯入的優惠'), findsOneWidget);
   });
 
   testWidgets('structured cloud products survive failed local OCR evidence', (
@@ -120,6 +117,7 @@ void main() {
       confidence: 0.98,
     );
     final service = ConsentImportService(
+      localOcrSucceeded: false,
       products: [
         ReconstructedProduct(
           regionId: 'card-1',
@@ -155,14 +153,84 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.byKey(const Key('accept-cloud-processing')));
     await tester.pumpAndSettle();
 
     expect(find.text('選擇要匯入的優惠'), findsOneWidget);
     expect(find.text('測試牛乳'), findsOneWidget);
-    expect(service.lastAllowCloudProcessing, isTrue);
+    expect(service.lastAllowCloudProcessing, isFalse);
+  });
+
+  testWidgets('one tap recovers a missed product without text entry', (
+    tester,
+  ) async {
+    const recoveredEvidence = FieldEvidence(
+      sourceType: ImportSourceType.image,
+      extractionMethod: ImportExtractionMethod.localOcr,
+      sourcePage: null,
+      regionId: 'recovery-card',
+      rawText: '光泉鮮乳 39元',
+      confidence: 0.9,
+      bounds: OcrRegionBounds(left: 0, top: 0, right: 0.5, bottom: 0.5),
+    );
+    final service = ConsentImportService(
+      recoveredProducts: [
+        ReconstructedProduct(
+          regionId: 'recovery-card',
+          sourceType: ImportSourceType.image,
+          sourcePage: null,
+          merchant: const EvidencedValue(
+            value: '全家便利商店',
+            evidence: recoveredEvidence,
+          ),
+          productName: const EvidencedValue(
+            value: '光泉鮮乳',
+            evidence: recoveredEvidence,
+          ),
+          promotionalPrice: const EvidencedValue(
+            value: 39,
+            evidence: recoveredEvidence,
+          ),
+          validUntil: EvidencedValue(
+            value: DateTime(2026, 8, 31),
+            evidence: recoveredEvidence,
+          ),
+          regionEvidence: recoveredEvidence,
+        ),
+      ],
+    );
+    final image = File(
+      '${Directory.systemTemp.path}/clover-widget-recovery.png',
+    );
+    image.writeAsBytesSync(
+      base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      ),
+    );
+    addTearDown(() async {
+      if (await image.exists()) await image.delete();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ImageImportScreen(
+          path: image.path,
+          service: service,
+          store: OfferStore(initialOffers: []),
+          reminders: RecordingReminderScheduler(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('recover-missing-product')));
+    await tester.pumpAndSettle();
+    await tester.tapAt(
+      tester.getCenter(find.byKey(const Key('missing-product-image'))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(service.recoveryCalls, 1);
+    expect(find.text('光泉鮮乳'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
   });
 
   testWidgets('scanned PDF asks consent before every cloud page request', (
@@ -843,10 +911,17 @@ class CancelledImportService implements CouponImportService {
 
 class ConsentImportService
     implements CouponImportService, SourceAdaptiveCouponImportService {
-  ConsentImportService({this.products = const []});
+  ConsentImportService({
+    this.products = const [],
+    this.recoveredProducts = const [],
+    this.localOcrSucceeded = true,
+  });
 
   final List<ReconstructedProduct> products;
+  final List<ReconstructedProduct> recoveredProducts;
+  final bool localOcrSucceeded;
   int analyzeCalls = 0;
+  int recoveryCalls = 0;
   bool? lastAllowCloudProcessing;
   final List<bool> pdfPageConsents = [];
 
@@ -865,13 +940,13 @@ class ConsentImportService
     lastAllowCloudProcessing = allowCloudProcessing;
     return SourceAdaptiveImportResult(
       route: ImportRoute.promotionalImage,
-      pages: const [
+      pages: [
         OcrPageResult(
           sourceType: ImportSourceType.image,
           pageNumber: null,
           text: '',
           lines: [],
-          succeeded: false,
+          succeeded: localOcrSucceeded,
           duration: Duration.zero,
         ),
       ],
@@ -879,8 +954,8 @@ class ConsentImportService
       cloudUsage: allowCloudProcessing
           ? const CloudProcessingUsage(requestCount: 1)
           : const CloudProcessingUsage(),
-      cloudWasDeclined: !allowCloudProcessing,
-      localFallbackUsed: !allowCloudProcessing,
+      cloudWasDeclined: false,
+      localFallbackUsed: false,
     );
   }
 
@@ -907,6 +982,25 @@ class ConsentImportService
       ),
       cloudWasDeclined: pdfPageConsents.any((value) => !value),
       localFallbackUsed: pdfPageConsents.any((value) => !value),
+    );
+  }
+
+  @override
+  Future<SourceAdaptiveImportResult> recoverImageRegion(
+    String path, {
+    required double normalizedX,
+    required double normalizedY,
+  }) async {
+    recoveryCalls++;
+    return SourceAdaptiveImportResult(
+      route: ImportRoute.promotionalImage,
+      pages: const [],
+      products: recoveredProducts,
+      localImageMetrics: const LocalImageProcessingMetrics(
+        proposedRegionCount: 1,
+        regionOcrCount: 1,
+        recoveryActionCount: 1,
+      ),
     );
   }
 

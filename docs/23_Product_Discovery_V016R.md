@@ -19,12 +19,23 @@ review remain common.
 The key outcome is less correction per useful promotion, not more candidates.
 Unknown is better than plausible-looking wrong data.
 
-## Privacy decision
+## Local POC decision — 2026-08-18
+
+Cloud vision must not be a required free/core dependency. Standard promotional
+images use local multi-signal region proposal and independent region OCR. A missed
+product is recovered by tapping it once, replacing multi-field manual entry.
+
+Primary KPI: No-Typing Import Rate >= 95%. Real-device POC thresholds are 7/8
+automatic FamilyMart regions and 11/12 PX Mart regions, with zero normal-path
+cloud requests and approximately zero recurring Founder inference cost.
+
+## Historical privacy/provider decision
 
 Founder approved Hybrid Local-first on 2026-08-16. Cloud vision is opt-in for the
 current selected image or required scanned pages only. Native PDFs stay local.
 
 Founder selected paid Google Gemini Developer API `gemini-3.6-flash` for the first
 real-device benchmark. The decision tests whether product-region vision materially
-improves FamilyMart/PX Mart recall without recreating V0.15 false positives; it does
-not authorize cloud processing of native Costco PDFs or other App data.
+improves FamilyMart/PX Mart recall without recreating V0.15 false positives. This
+infrastructure is now preserved only for optional research/future paid use and is
+not invoked by the core image flow.

@@ -74,6 +74,33 @@ class DocumentUnderstandingPipeline {
           readingOrder: index,
         ),
     ];
+    if (page.sourceRegionId != null && page.sourceBounds != null) {
+      final explicitShared = <ClassifiedOcrLine>[
+        for (var index = 0; index < page.sharedPositionedLines.length; index++)
+          ClassifiedOcrLine(
+            line: page.sharedPositionedLines[index],
+            type: classify(page.sharedPositionedLines[index]),
+            readingOrder: classified.length + index,
+          ),
+      ].where(_isSharedPageBlock).toList();
+      final locallyShared = classified.where(_isSharedPageBlock).toList();
+      final owned = classified
+          .where((block) => !_isSharedPageBlock(block))
+          .toList();
+      return DocumentUnderstandingResult(
+        regions: owned.isEmpty
+            ? const []
+            : [
+                ProductRegion(
+                  id: page.sourceRegionId!,
+                  bounds: page.sourceBounds!,
+                  blocks: owned,
+                ),
+              ],
+        sharedBlocks: [...explicitShared, ...locallyShared],
+        classifiedBlocks: [...classified, ...explicitShared],
+      );
+    }
     final shared = classified.where(_isSharedPageBlock).toList();
     final assignable = classified
         .where((block) => !_isSharedPageBlock(block))
@@ -125,6 +152,9 @@ class DocumentUnderstandingPipeline {
     if (_merchant.hasMatch(value)) return SemanticBlockType.merchant;
     if (_date.hasMatch(value)) return SemanticBlockType.date;
     if (_item.hasMatch(value)) return SemanticBlockType.itemNumber;
+    if (_embeddedProductPrice.hasMatch(value)) {
+      return SemanticBlockType.productName;
+    }
     if (_originalPrice.hasMatch(value)) return SemanticBlockType.originalPrice;
     if (_promoPrice.hasMatch(value)) return SemanticBlockType.promoPrice;
     if (_discount.hasMatch(value)) return SemanticBlockType.discount;
@@ -427,6 +457,10 @@ class DocumentUnderstandingPipeline {
   );
   static final RegExp _originalPrice = RegExp(
     r'(?:原價|原售價|一般售價|定價)\s*[:：]?\s*(?:NT\$|NT|[$＄])?\s*[0-9][0-9,]*(?:\.[0-9]+)?',
+    caseSensitive: false,
+  );
+  static final RegExp _embeddedProductPrice = RegExp(
+    r'^[A-Za-z\u4e00-\u9fff].{1,70}(?:優惠價|特價|促銷價|會員價|福利價|售價|NT\$|[$＄])\s*[:：]?\s*[0-9][0-9,]*(?:\.[0-9]+)?\s*(?:元)?$',
     caseSensitive: false,
   );
   static final RegExp _promoPrice = RegExp(

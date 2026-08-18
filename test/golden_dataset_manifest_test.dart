@@ -28,6 +28,13 @@ void main() {
         'cloud_output_tokens',
         'cloud_total_tokens',
         'estimated_processing_cost_usd',
+        'proposed_product_region_count',
+        'fabricated_field_count',
+        'no_typing_import_rate',
+        'recovery_action_count',
+        'manual_text_entry_count',
+        'median_processing_milliseconds',
+        'p95_processing_milliseconds',
       }),
     );
     expect(metrics['status'], startsWith('pending'));
@@ -61,7 +68,7 @@ void main() {
     );
     expect(excluded.join(' '), contains('mobile status bar'));
     expect(excluded.join(' '), contains('payment campaign'));
-    expect(value['maximum_cloud_requests'], 1);
+    expect(value['maximum_cloud_requests'], 0);
     expect(value['expected_valid_until'], '2026-08-13');
     expectMetricTemplate(value);
   });

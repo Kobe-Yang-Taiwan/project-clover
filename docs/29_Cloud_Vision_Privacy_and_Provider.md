@@ -1,5 +1,13 @@
 # Cloud Vision Privacy and Provider Gate
 
+## Current runtime status — dormant / optional research
+
+As of the V0.16R Local Image POC, Cloud Vision is not invoked by the standard
+promotional-image import flow and is not a required free/core dependency. The
+provider abstraction, proxy and privacy controls remain preserved for internal
+benchmarking, a future optional paid capability or explicitly approved research.
+No new Gemini infrastructure is deployed by this POC.
+
 ## Founder Test selection
 
 | Item | Approved configuration |

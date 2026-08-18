@@ -13,6 +13,9 @@ Project Clover 是一款 Android 優先的優惠管理原型，協助使用者�
 - 100% 代表最終寫入資料通過驗證，不代表假裝 OCR 永遠正確
 - 原生文字 PDF 預設完全本機處理；只有選取的促銷圖片或必要掃描頁可在逐次同意後傳送
 - Founder Test 使用付費 Gemini `gemini-3.6-flash`，Android 只連 Clover proxy，不包含 Gemini API key
+- 標準圖片匯入改用本機多訊號商品區域提案與逐區 OCR，正常路徑不呼叫雲端 API
+- 漏掉商品時可直接點圖片中的商品，系統自動裁切、OCR 與重建，不需逐欄打字
+- Gemini/provider/proxy code 保留為停用的研究／未來可選能力，不是免費核心流程依賴
 
 ## V0.15 Smart Universal Import 歷史功能
 

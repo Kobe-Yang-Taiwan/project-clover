@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -31,7 +32,7 @@ class ImportChoiceSheet extends StatelessWidget {
               key: const Key('image-import-choice'),
               leading: const Icon(Icons.image_outlined),
               title: const Text('匯入圖片'),
-              subtitle: const Text('優先使用本機；需要雲端視覺時會先詢問'),
+              subtitle: const Text('本機分析商品區域；漏抓時可點一下補回'),
               onTap: () => Navigator.of(context).pop(ImportChoice.image),
             ),
             ListTile(
@@ -117,17 +118,9 @@ class _ImageImportScreenState extends State<ImageImportScreen> {
     if (widget.service case final SourceAdaptiveCouponImportService adaptive) {
       await Future<void>.delayed(Duration.zero);
       if (!mounted) return;
-      final allowCloud = adaptive.cloudVisionAvailable
-          ? await _requestCloudConsent(
-              context,
-              assetDescription: '這次主動選取的 1 張圖片',
-              disclosure: adaptive.cloudVisionDisclosure,
-            )
-          : false;
-      if (!mounted) return;
       adaptiveResult = await adaptive.analyzeImage(
         widget.path,
-        allowCloudProcessing: allowCloud,
+        allowCloudProcessing: false,
       );
       result = adaptiveResult.pages.isEmpty ? null : adaptiveResult.pages.first;
     } else {
@@ -142,7 +135,8 @@ class _ImageImportScreenState extends State<ImageImportScreen> {
     final parsed = adaptiveResult == null
         ? widget.parser.parsePagesDetailed([result!])
         : widget.parser.parseAdaptive(adaptiveResult);
-    if (parsed.candidates.isEmpty) {
+    if (parsed.candidates.isEmpty &&
+        widget.service is! SourceAdaptiveCouponImportService) {
       setState(() => error = '圖片中沒有可供檢查的商品優惠。');
       return;
     }
@@ -159,6 +153,10 @@ class _ImageImportScreenState extends State<ImageImportScreen> {
           excludedCandidates: parsed.excludedCandidates,
           processingNotice: _processingNotice(adaptiveResult),
           imagePath: widget.path,
+          recoveryService: widget.service is SourceAdaptiveCouponImportService
+              ? widget.service as SourceAdaptiveCouponImportService
+              : null,
+          parser: widget.parser,
           store: widget.store,
           reminders: widget.reminders,
         ),
@@ -630,9 +628,8 @@ class _CandidateEditorState extends State<CandidateEditor> {
     } catch (_) {
       if (!mounted) return;
       setState(() => saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('匯入失敗，既有優惠沒有變更。')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('匯入失敗，既有優惠沒有變更。')));
     }
   }
 
@@ -665,6 +662,8 @@ class BatchReviewScreen extends StatefulWidget {
     this.excludedCandidates = const [],
     this.imagePath,
     this.processingNotice,
+    this.recoveryService,
+    this.parser = const CouponParser(),
     super.key,
   });
 
@@ -676,6 +675,8 @@ class BatchReviewScreen extends StatefulWidget {
   final List<CouponCandidate> excludedCandidates;
   final String? imagePath;
   final String? processingNotice;
+  final SourceAdaptiveCouponImportService? recoveryService;
+  final CouponParser parser;
 
   @override
   State<BatchReviewScreen> createState() => _BatchReviewScreenState();
@@ -689,7 +690,13 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
     });
   bool needsReviewOnly = false;
   bool saving = false;
+  bool recovering = false;
   bool showProcessingNotice = true;
+  late List<CouponCandidate> excludedCandidates = List.from(
+    widget.excludedCandidates,
+  );
+  late ImportQualityReport? qualityReport = widget.qualityReport;
+  int recoveryActions = 0;
 
   List<CouponCandidate> get visible => needsReviewOnly
       ? candidates.where((candidate) => candidate.needsReview).toList()
@@ -720,15 +727,16 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
               content: Text('${widget.failedPages} 頁辨識失敗，其餘頁面仍可繼續檢查。'),
               actions: [TextButton(onPressed: () {}, child: const Text('知道了'))],
             ),
-          if (widget.qualityReport != null)
+          if (qualityReport != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  '可直接匯入 ${widget.qualityReport!.readyCount} 筆・'
-                  '需要確認 ${widget.qualityReport!.needsReviewCount} 筆・'
-                  '已排除 ${widget.qualityReport!.rejectedCount} 筆',
+                  '可直接匯入 ${candidates.where((item) => item.state == CandidateState.ready).length} 筆・'
+                  '需要確認 ${candidates.where((item) => item.state == CandidateState.needsReview).length} 筆・'
+                  '已排除 ${excludedCandidates.length} 筆'
+                  '${recoveryActions == 0 ? '' : '・已點選補回 $recoveryActions 次'}',
                 ),
               ),
             ),
@@ -751,10 +759,22 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
                   onSelected: (value) =>
                       setState(() => needsReviewOnly = value),
                 ),
-                if (widget.excludedCandidates.isNotEmpty)
+                if (excludedCandidates.isNotEmpty)
                   TextButton(
                     onPressed: _showExcluded,
-                    child: Text('查看已排除 ${widget.excludedCandidates.length} 筆'),
+                    child: Text('查看已排除 ${excludedCandidates.length} 筆'),
+                  ),
+                if (widget.imagePath != null && widget.recoveryService != null)
+                  FilledButton.tonalIcon(
+                    key: const Key('recover-missing-product'),
+                    onPressed: recovering ? null : _recoverMissingProduct,
+                    icon: recovering
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.touch_app_outlined),
+                    label: const Text('少了一個商品？點一下圖片中的商品'),
                   ),
               ],
             ),
@@ -875,7 +895,7 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
             title: Text('已排除內容'),
             subtitle: Text('這些片段不會被選取或匯入，可供檢查分類結果。'),
           ),
-          for (final candidate in widget.excludedCandidates)
+          for (final candidate in excludedCandidates)
             ListTile(
               title: Text(candidate.title.isEmpty ? '非商品內容' : candidate.title),
               subtitle: Text(
@@ -914,6 +934,62 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _recoverMissingProduct() async {
+    final path = widget.imagePath;
+    final service = widget.recoveryService;
+    if (path == null || service == null) return;
+    final location = await _pickImageLocation(context, path);
+    if (location == null || !mounted) return;
+    setState(() => recovering = true);
+    try {
+      final result = await service.recoverImageRegion(
+        path,
+        normalizedX: location.dx,
+        normalizedY: location.dy,
+      );
+      final parsed = widget.parser.parseAdaptive(result);
+      if (!mounted) return;
+      final recovered = _markDuplicates(
+        parsed.candidates,
+        widget.store.allOffers,
+      );
+      final unique = recovered.where((candidate) {
+        return !candidates.any(
+          (existing) =>
+              existing.title.trim().toLowerCase() ==
+                  candidate.title.trim().toLowerCase() &&
+              existing.merchant.trim().toLowerCase() ==
+                  candidate.merchant.trim().toLowerCase() &&
+              existing.promotionalPrice == candidate.promotionalPrice,
+        );
+      }).toList();
+      setState(() {
+        recoveryActions++;
+        candidates.addAll(unique);
+        candidates.sort((a, b) {
+          if (a.needsReview != b.needsReview) return a.needsReview ? -1 : 1;
+          return a.id.compareTo(b.id);
+        });
+        excludedCandidates.addAll(parsed.excludedCandidates);
+        recovering = false;
+      });
+      if (unique.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('這個區域尚未辨識出可用商品，請點商品名稱與價格附近再試。')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已自動補回 ${unique.length} 個商品區域，請確認標示欄位。')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => recovering = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('無法分析點選區域，未變更既有候選項目。')));
+    }
   }
 
   Future<void> _confirmImport() async {
@@ -978,17 +1054,72 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
       if (granted) await widget.reminders.sync(widget.store.activeOffers);
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('已匯入 ${selected.length} 張優惠')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('已匯入 ${selected.length} 張優惠')));
     } catch (_) {
       if (!mounted) return;
       setState(() => saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('批次匯入失敗，既有資料沒有變更。')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('批次匯入失敗，既有資料沒有變更。')));
     }
   }
+}
+
+Future<Offset?> _pickImageLocation(BuildContext context, String path) async {
+  final bytes = await File(path).readAsBytes();
+  final codec = await ui.instantiateImageCodec(bytes);
+  late final double aspectRatio;
+  try {
+    final frame = await codec.getNextFrame();
+    try {
+      aspectRatio = frame.image.width / frame.image.height;
+    } finally {
+      frame.image.dispose();
+    }
+  } finally {
+    codec.dispose();
+  }
+  if (!context.mounted) return null;
+  return showDialog<Offset>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('點一下漏掉的商品'),
+      content: SizedBox(
+        width: 520,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final height = width / aspectRatio;
+            return SizedBox(
+              width: width,
+              height: height,
+              child: GestureDetector(
+                key: const Key('missing-product-image'),
+                behavior: HitTestBehavior.opaque,
+                onTapUp: (details) => Navigator.of(context).pop(
+                  Offset(
+                    (details.localPosition.dx / width)
+                        .clamp(0.0, 1.0)
+                        .toDouble(),
+                    (details.localPosition.dy / height)
+                        .clamp(0.0, 1.0)
+                        .toDouble(),
+                  ),
+                ),
+                child: Image.file(File(path), fit: BoxFit.fill),
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ],
+    ),
+  );
 }
 
 String? _processingNotice(SourceAdaptiveImportResult? result) {
@@ -1008,6 +1139,10 @@ String? _processingNotice(SourceAdaptiveImportResult? result) {
   }
   if (result.localFallbackUsed) {
     return '雲端視覺未設定或無法使用，本次已改用本機辨識；結果可能需要較多確認。';
+  }
+  if (result.route == ImportRoute.promotionalImage) {
+    return '本次全程使用本機商品區域分析與逐區 OCR，未上傳圖片。'
+        '共提出 ${result.localImageMetrics.proposedRegionCount} 個區域。';
   }
   return 'Native-text PDF 已使用本機文字與版面解析，未上傳 PDF。';
 }
