@@ -628,8 +628,9 @@ class _CandidateEditorState extends State<CandidateEditor> {
     } catch (_) {
       if (!mounted) return;
       setState(() => saving = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('匯入失敗，既有優惠沒有變更。')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('匯入失敗，既有優惠沒有變更。')));
     }
   }
 
@@ -987,8 +988,9 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => recovering = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('無法分析點選區域，未變更既有候選項目。')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('無法分析點選區域，未變更既有候選項目。')));
     }
   }
 
@@ -1054,13 +1056,15 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
       if (granted) await widget.reminders.sync(widget.store.activeOffers);
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('已匯入 ${selected.length} 張優惠')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已匯入 ${selected.length} 張優惠')));
     } catch (_) {
       if (!mounted) return;
       setState(() => saving = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('批次匯入失敗，既有資料沒有變更。')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('批次匯入失敗，既有資料沒有變更。')));
     }
   }
 }

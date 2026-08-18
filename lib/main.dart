@@ -264,8 +264,9 @@ class _CloverHomeState extends State<CloverHome> {
       );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('目前無法讀取軟體版本')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('目前無法讀取軟體版本')));
     }
   }
 
@@ -345,8 +346,9 @@ class _CloverHomeState extends State<CloverHome> {
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('備份失敗，請稍後再試')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('備份失敗，請稍後再試')));
     }
   }
 
@@ -398,12 +400,14 @@ class _CloverHomeState extends State<CloverHome> {
       );
     } on FormatException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.message.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message.toString())));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('還原失敗，請確認備份檔是否正確')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('還原失敗，請確認備份檔是否正確')));
     }
   }
 
@@ -447,16 +451,19 @@ class _CloverHomeState extends State<CloverHome> {
       );
     } on ImportLimitException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } on FormatException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('無法開啟選取的檔案，請確認格式後再試。')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('無法開啟選取的檔案，請確認格式後再試。')));
     }
   }
 }
@@ -635,12 +642,14 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
         ),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('已儲存；現有優惠維持原設定')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已儲存；現有優惠維持原設定')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('無法儲存提醒預設')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('無法儲存提醒預設')));
     } finally {
       if (mounted) setState(() => isBusy = false);
     }
@@ -674,8 +683,9 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
     if (!mounted || range == null) return;
     final count = widget.store.expiredOffersForCleanup(range).length;
     if (count == 0) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('沒有符合條件的過期優惠')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('沒有符合條件的過期優惠')));
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -720,8 +730,9 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('清理失敗，資料未變更')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('清理失敗，資料未變更')));
     } finally {
       if (mounted) setState(() => isBusy = false);
     }
@@ -735,12 +746,14 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
       );
       final opened = await widget.feedbackLauncher.open(info);
       if (!mounted || opened) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('找不到可用的 Email App')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('找不到可用的 Email App')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('目前無法開啟回饋 Email')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('目前無法開啟回饋 Email')));
     } finally {
       if (mounted) setState(() => isBusy = false);
     }
@@ -754,12 +767,14 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
       );
       final exported = await widget.diagnosticExportService.export(info);
       if (!mounted || !exported) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('診斷資訊已匯出')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('診斷資訊已匯出')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('診斷資訊匯出失敗')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('診斷資訊匯出失敗')));
     } finally {
       if (mounted) setState(() => isBusy = false);
     }
@@ -1339,12 +1354,14 @@ class _OfferListScreenState extends State<OfferListScreen> {
         selectedIds.clear();
         selectionMode = false;
       });
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('已完成 ${ids.length} 張優惠的批次操作')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已完成 ${ids.length} 張優惠的批次操作')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('批次操作失敗，資料未變更')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('批次操作失敗，資料未變更')));
     }
   }
 }
@@ -1735,8 +1752,9 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => isSaving = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('儲存失敗，請稍後再試')));
     }
   }
 }

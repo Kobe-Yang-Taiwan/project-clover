@@ -59,8 +59,9 @@ class CouponParser {
         .where(
           (block) =>
               block.type == SemanticBlockType.date &&
-              RegExp(r'優惠期間|活動期間|有效期間|有效期限|使用期限|兌換期限|截止|至\s*\d')
-                  .hasMatch(block.line.text),
+              RegExp(
+                r'優惠期間|活動期間|有效期間|有效期限|使用期限|兌換期限|截止|至\s*\d',
+              ).hasMatch(block.line.text),
         )
         .map((block) => block.line.text)
         .join('\n');
@@ -480,8 +481,9 @@ class CouponParser {
           value.value > 0 &&
           value.evidence.isUsable &&
           value.evidence.confidence >= 0.75 &&
-          !RegExp(r'平均|單價|每(?:件|組|包|瓶|罐)|滿\s*[0-9,]+|回饋|紅利|點數')
-              .hasMatch(value.evidence.rawText)
+          !RegExp(
+            r'平均|單價|每(?:件|組|包|瓶|罐)|滿\s*[0-9,]+|回饋|紅利|點數',
+          ).hasMatch(value.evidence.rawText)
       ? value.value
       : null;
 
@@ -898,8 +900,9 @@ class CouponParser {
       if (match != null) return match.group(1)!.trim();
     }
     final title = _extractTitle(lines);
-    final match = RegExp(r'^([A-Z][A-Z0-9.&-]{1,20})(?:\s+|$)')
-        .firstMatch(title);
+    final match = RegExp(
+      r'^([A-Z][A-Z0-9.&-]{1,20})(?:\s+|$)',
+    ).firstMatch(title);
     return match?.group(1) ?? '';
   }
 
@@ -922,16 +925,18 @@ class CouponParser {
     final standalone = <num>[];
     for (final line in lines) {
       if (_looksLikeDate(line) || _isBundleOrThreshold(line)) continue;
-      if (RegExp(r'原價|原售價|一般售價|定價|優惠價|特價|促銷價|賣場售價|會員價|現省|省下|折價|折抵|共省')
-          .hasMatch(line)) {
+      if (RegExp(
+        r'原價|原售價|一般售價|定價|優惠價|特價|促銷價|賣場售價|會員價|現省|省下|折價|折抵|共省',
+      ).hasMatch(line)) {
         continue;
       }
       final match = RegExp(
         r'^(?:NT\$|NT|[$＄])?\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:元)?$',
       ).firstMatch(line.trim());
       if (match != null) standalone.add(_amount(match.group(1))!);
-      final savingsMatch = RegExp(r'^-\s*([0-9][0-9,]*(?:\.[0-9]+)?)$')
-          .firstMatch(line);
+      final savingsMatch = RegExp(
+        r'^-\s*([0-9][0-9,]*(?:\.[0-9]+)?)$',
+      ).firstMatch(line);
       if (savingsMatch != null)
         statedSavings ??= _amount(savingsMatch.group(1));
     }
@@ -972,8 +977,9 @@ class CouponParser {
     final discounts = <num>[];
     for (final block in region.blocks) {
       final text = block.line.text.trim();
-      final discountMatch = RegExp(r'^-\s*([0-9][0-9,]*(?:\.[0-9]+)?)$')
-          .firstMatch(text);
+      final discountMatch = RegExp(
+        r'^-\s*([0-9][0-9,]*(?:\.[0-9]+)?)$',
+      ).firstMatch(text);
       if (discountMatch != null) {
         final value = _amount(discountMatch.group(1));
         if (value != null) discounts.add(value);
@@ -1014,8 +1020,9 @@ class CouponParser {
     return lines
         .where(pattern.hasMatch)
         .map((line) {
-          final standaloneDiscount = RegExp(r'^-\s*([0-9][0-9,]*)$')
-              .firstMatch(line.trim());
+          final standaloneDiscount = RegExp(
+            r'^-\s*([0-9][0-9,]*)$',
+          ).firstMatch(line.trim());
           return standaloneDiscount == null
               ? line
               : '折價 ${standaloneDiscount.group(1)} 元';
@@ -1127,8 +1134,9 @@ class CouponParser {
     if (_looksLikeUiNoise(value) || _looksLikePrice(value)) return false;
     if (_isNonProductLine(value) || _extractConditions([value]).isNotEmpty)
       return false;
-    if (RegExp(r'^(平均一組|優惠期間|活動期間|有效期限|使用期限|兌換期限|注意事項|本券|共\s*\d+\s*週)')
-        .hasMatch(value)) {
+    if (RegExp(
+      r'^(平均一組|優惠期間|活動期間|有效期限|使用期限|兌換期限|注意事項|本券|共\s*\d+\s*週)',
+    ).hasMatch(value)) {
       return false;
     }
     if (RegExp(r'^(品牌|店家|商家|適用門市|來源)[:：]').hasMatch(value)) {

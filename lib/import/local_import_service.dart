@@ -624,9 +624,9 @@ class LocalCouponImportService
   bool _isReliableNativeText(PdfPage page, PdfPageText text) {
     final compact = text.fullText.replaceAll(RegExp(r'\s'), '');
     if (compact.length < 80 || text.fragments.length < 8) return false;
-    final identityCharacters = RegExp(r'[A-Za-z0-9\u4e00-\u9fff]')
-        .allMatches(compact)
-        .length;
+    final identityCharacters = RegExp(
+      r'[A-Za-z0-9\u4e00-\u9fff]',
+    ).allMatches(compact).length;
     if (identityCharacters / compact.length < 0.55) return false;
     final top = text.fragments
         .map((fragment) => fragment.bounds.top)
