@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -1069,62 +1068,42 @@ class _BatchReviewScreenState extends State<BatchReviewScreen> {
   }
 }
 
-Future<Offset?> _pickImageLocation(BuildContext context, String path) async {
-  final bytes = await File(path).readAsBytes();
-  final codec = await ui.instantiateImageCodec(bytes);
-  late final double aspectRatio;
-  try {
-    final frame = await codec.getNextFrame();
-    try {
-      aspectRatio = frame.image.width / frame.image.height;
-    } finally {
-      frame.image.dispose();
-    }
-  } finally {
-    codec.dispose();
-  }
-  if (!context.mounted) return null;
-  return showDialog<Offset>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('點一下漏掉的商品'),
-      content: SizedBox(
-        width: 520,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final height = width / aspectRatio;
-            return SizedBox(
-              width: width,
-              height: height,
-              child: GestureDetector(
-                key: const Key('missing-product-image'),
-                behavior: HitTestBehavior.opaque,
-                onTapUp: (details) => Navigator.of(context).pop(
+Future<Offset?> _pickImageLocation(BuildContext context, String path) =>
+    showDialog<Offset>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('點一下漏掉的商品'),
+        content: SizedBox(
+          width: 520,
+          child: Builder(
+            builder: (imageContext) => GestureDetector(
+              key: const Key('missing-product-image'),
+              behavior: HitTestBehavior.opaque,
+              onTapUp: (details) {
+                final renderBox = imageContext.findRenderObject()! as RenderBox;
+                Navigator.of(context).pop(
                   Offset(
-                    (details.localPosition.dx / width)
+                    (details.localPosition.dx / renderBox.size.width)
                         .clamp(0.0, 1.0)
                         .toDouble(),
-                    (details.localPosition.dy / height)
+                    (details.localPosition.dy / renderBox.size.height)
                         .clamp(0.0, 1.0)
                         .toDouble(),
                   ),
-                ),
-                child: Image.file(File(path), fit: BoxFit.fill),
-              ),
-            );
-          },
+                );
+              },
+              child: Image.file(File(path), fit: BoxFit.contain),
+            ),
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-      ],
-    ),
-  );
-}
+    );
 
 String? _processingNotice(SourceAdaptiveImportResult? result) {
   if (result == null) return null;
