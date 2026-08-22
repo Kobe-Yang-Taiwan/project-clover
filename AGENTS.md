@@ -12,6 +12,24 @@ This repository is the single source of truth for Project Clover development. Fo
 ## Source of Truth
 Before implementing a version, Codex must read the approved version specification under `docs/development/` plus this file. Do not rely on an old chat prompt when repository instructions are newer.
 
+## Persistent Context Layer
+Project Clover keeps durable AI-readable context under `docs/context/` so models and agents do not restart from zero or repeat prior failed approaches.
+
+Before any non-trivial engineering, remediation, architecture, QA, or acceptance task, read in this order:
+1. `AGENTS.md`
+2. `docs/context/CURRENT_STATE.md`
+3. `docs/context/DECISIONS.md`
+4. `docs/context/IMPORT_NEGATIVE_CASES.md` when the task touches Import
+5. `docs/context/FOUNDER_TEST_EVIDENCE.md` when the task touches QA, acceptance, regression, or a previously failed workflow
+6. the currently approved version specification under `docs/development/`
+
+Rules:
+- Repository context outranks stale chat prompts.
+- Verified Founder real-device evidence outranks assumptions and synthetic success claims.
+- A negative case remains active until a later real-device regression proves it resolved.
+- Do not reopen an active durable Founder/product decision without new evidence or an explicit Founder decision.
+- Keep context documents concise, factual, and synchronized when a material decision or real-world test changes project state.
+
 ## State Machine
 Every version uses these states:
 SPEC -> IMPLEMENTING -> LOCAL_QA -> READY_TO_PUSH -> CI_BUILD -> FOUNDER_TEST -> ACCEPTED -> RELEASED
@@ -108,17 +126,19 @@ For each approved version, keep the repository documentation synchronized where 
 - release notes;
 - Known Limitations;
 - Founder Acceptance Checklist;
-- Draft PR description.
+- Draft PR description;
+- relevant files under `docs/context/` when current state, durable decisions, negative cases, or Founder evidence materially change.
 
 Do not invent missing historical facts. Add/update documents from approved product decisions and verified implementation evidence.
 
 ## Codex Start Contract
 When asked to execute an approved version:
 1. Read this `AGENTS.md`.
-2. Read the approved version spec under `docs/development/`.
-3. Inspect current repository/worktree and preserve valid existing work.
-4. Report only genuine contradictions/blockers requiring Founder input.
-5. Otherwise implement autonomously through Local QA and Commit.
-6. Continue through Push/CI/Build when authorization and tooling permit.
-7. Stop for Founder Acceptance with a concise real-device checklist.
-8. Never merge `main` without explicit Founder approval.
+2. Read the persistent context files required by the task under `docs/context/`.
+3. Read the approved version spec under `docs/development/`.
+4. Inspect current repository/worktree and preserve valid existing work.
+5. Report only genuine contradictions/blockers requiring Founder input.
+6. Otherwise implement autonomously through Local QA and Commit.
+7. Continue through Push/CI/Build when authorization and tooling permit.
+8. Stop for Founder Acceptance with a concise real-device checklist.
+9. Never merge `main` without explicit Founder approval.
