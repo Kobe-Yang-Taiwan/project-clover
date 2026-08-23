@@ -17,6 +17,7 @@ Current conclusion:
 - The original pain is real: owned promotions/coupons are easy to forget and scattered across sources.
 - A real tester already showed that manual coupon entry creates too much friction.
 - The Import experience is still not reliable enough to support broader product validation.
+- Early platform-demand evidence exists: during V0.16 friend testing, most invited testers used iPhone and multiple people proactively asked whether an iPhone version was available to try.
 - Willingness to pay, retention frequency, economic buyer, distribution, and moat are not yet proven.
 
 Do not interpret engineering progress as business validation.
@@ -166,7 +167,7 @@ Retention has not yet been proven with real cohorts.
 
 ## 8. Distribution
 
-Status: UNPROVEN
+Status: UNPROVEN, WITH EARLY iOS DEMAND SIGNAL
 
 Questions:
 - Where will the first 10 users come from?
@@ -174,6 +175,20 @@ Questions:
 - Which communities naturally contain heavy promotion/coupon users?
 - Is the product easy enough to demonstrate through screenshots/video/social sharing?
 - Can one user naturally introduce Clover to a spouse/family member?
+
+### Early iOS Demand Evidence
+During V0.16 friend testing:
+- most of the friends invited to test were iPhone users;
+- multiple people proactively asked whether an iPhone version was available for them to try;
+- the Founder currently owns only an Android phone, so Android remains the primary development and real-device acceptance platform for now.
+
+Interpretation:
+- This is stronger than a generic compliment because the user is expressing intent to try the product if the platform barrier is removed.
+- It is still early evidence, not proof of retention, willingness to pay, or product-market fit.
+- Do not start iOS development merely because this signal exists. Preserve Flutter cross-platform compatibility and continue collecting iOS test interest while the Android core flow is stabilized.
+
+Suggested metric:
+- iOS Waitlist / Test Interest Intent = number of iPhone users who explicitly ask to be notified or included when an iOS beta becomes available.
 
 Do not assume App Store / Google Play presence creates distribution.
 
@@ -235,7 +250,7 @@ Current status:
 | Usage frequency? | UNKNOWN |
 | Why not existing alternatives? | HYPOTHESIS ONLY |
 | Moat? | HYPOTHESIS ONLY |
-| Voluntary continued usage? | NOT YET PROVEN |
+| Voluntary continued usage? | EARLY SIGNAL — iPhone users proactively asked for an iOS version to try; continued usage not yet proven |
 
 ---
 
@@ -245,15 +260,17 @@ Current status:
 - Real household problem motivated the project.
 - Manual entry was explicitly rejected by a real tester as too much work.
 - Import accuracy is currently a blocking product issue, not merely a technical polish issue.
+- During V0.16 friend testing, multiple iPhone users proactively asked whether an iPhone version was available to try. Record this as Early iOS Demand Evidence, not as retention or willingness-to-pay proof.
 
 ### Evidence still required
 - 5–10 target-user interviews outside close-support bias where possible.
 - Repeated use across multiple weeks.
 - Evidence that users return without Founder prompting.
-- Evidence that users ask to keep using Clover.
+- Evidence that users ask to keep using Clover after actual hands-on use.
 - Quantified value saved / waste avoided.
 - Willingness-to-pay evidence.
 - Activation and retention measurements after Import becomes usable.
+- Count of explicit iOS waitlist / beta-test requests, rather than relying only on anecdotal recall.
 
 ---
 
@@ -279,7 +296,8 @@ Prefer evidence such as:
 - user returns later;
 - user acts on a reminder;
 - user asks to keep the app;
-- user recommends it to another household member.
+- user recommends it to another household member;
+- iPhone users explicitly opt in to be notified for an iOS beta.
 
 Compliments such as "很酷" are weak evidence unless paired with behavior.
 
@@ -330,7 +348,7 @@ Do not interpret one negative interview as a kill signal. Look for repeated patt
 2. Validate target user and recurring pain.
 3. Validate retention trigger / usage frequency.
 4. Validate willingness to pay and economic buyer.
-5. Validate distribution.
+5. Validate distribution, including quantified iOS test interest.
 6. Only then expand monetization and moat-building investment.
 
 Do not reverse this order merely because AI makes feature development cheap.
