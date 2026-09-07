@@ -43,7 +43,9 @@ class CriticalDraft {
     for (final line in lines) {
       // Keep qualifying text such as minimum spend. Long, unclear terms need
       // correction, not an amount stripped of its conditions.
-      if (line.length <= 80 && discount.hasMatch(line) && !values.contains(line)) {
+      if (line.length <= 80 &&
+          discount.hasMatch(line) &&
+          !values.contains(line)) {
         values.add(line);
       }
       // Dates without a year remain unknown. Do not mistake manufacture dates
