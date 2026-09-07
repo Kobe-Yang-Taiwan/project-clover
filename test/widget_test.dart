@@ -26,7 +26,7 @@ void main() {
 
     expect(find.text('手動輸入'), findsOneWidget);
     expect(find.text('匯入圖片'), findsOneWidget);
-    expect(find.text('匯入 PDF'), findsOneWidget);
+    expect(find.text('匯入 PDF（舊版實驗功能）'), findsOneWidget);
     await tester.tap(find.byKey(const Key('manual-entry-choice')));
     await tester.pumpAndSettle();
 

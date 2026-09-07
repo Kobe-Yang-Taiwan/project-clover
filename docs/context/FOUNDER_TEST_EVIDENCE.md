@@ -1,3 +1,33 @@
+# Founder test evidence
+
+Provenance: Founder-supplied `PROJECT CLOVER — IMPORT SCOPE REDUCTION VALIDATION`
+instruction, uploaded as `已貼上文字 (1)(3).txt`, plus baseline repository records.
+Reported outcomes below are not measurements from the 2026-09-05 preflight.
+
+| Case | Ground truth | Founder observed | Evidence limitation |
+|---|---|---|---|
+| PX Mart image | 12 products | 7 regions; 0 direct; 13 classification records | No line/region trace |
+| Costco native PDF | 129 products on pages 2–9 | 0 direct; 111 confirmation; 229 excluded | No full record export |
+| Costco Page 2 | 16 cells | Prior analysis: approximately 14 ITEM-based regions | Not replayed this session |
+
+Original assets remain external; do not publish copyrighted binaries or raw OCR
+to the public repository. Existing manifests stay unchanged.
+SHA-256 rechecked locally on 2026-09-05:
+
+- PX Mart `01-1000016657.jpg`:
+  `c04da3c30f5e09772e4720310af32adcd827b0cbacc91be08aa9f0e8bbba2bad`
+- Costco `491181515833374.pdf`:
+  `4928080d9e5d863dc0b053ef40f116b80b29d2041981abbe7a04cd8eb7388911`
+
+Historical engineering evidence: `../27_V016R_Release_Notes.md`,
+Actions #99, artifact 9336905618, 131/131 tests. No current CI rerun.
+Raw asset presence proves input availability, not Android OCR reproducibility.
+
+## Remote context preserved from e1775af (2026-08-23)
+
+Historical KPI/authorization statements below are superseded by the current scope.
+The real-user observations remain valid evidence and are not discarded.
+
 # Project Clover — Founder Test Evidence
 
 Last updated: 2026-08-23

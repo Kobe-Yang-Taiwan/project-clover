@@ -1,6 +1,35 @@
 # Project Clover Development Dashboard
 
-_Last updated: 2026-08-18_
+> CURRENT AUTHORITY — 2026-09-07: Founder authorized EXECUTE MODE for
+> **0.17.0+20 Simplified Playable MVP**. **REDUCE IMPORT AMBITION**.
+> Problem: benefits are forgotten, expire, and lose value. Outcome:
+> **Benefit Captured / Money Saved**. Current MVP: image Capture → Name /
+> Expiration / Value Draft → Confirm → local Save → Reminder.
+> Full Product Reconstruction and diagnostic root-cause completion are not
+> blocking requirements. Older no-Build-20 / diagnostic-first gates below are
+> historical and superseded. Existing negative cases remain unresolved.
+> Status: IMPLEMENTING; new QA/APK pending; Founder Test PENDING.
+> Next authorized task: finish targeted implementation, tests and Android build.
+> Current specification: docs/development/SIMPLIFIED_MVP_BUILD20.md.
+> Results: docs/development/BUILD20_EVIDENCE.md. No main merge authorized.
+
+_Current status updated: 2026-09-05; historical snapshot below retained._
+
+## Active status — overrides historical snapshot below
+
+- Build 19 engineering PASS (historical); Founder Test FAIL (Founder reported).
+- REDUCE IMPORT AMBITION: full reconstruction is not an MVP Gate.
+- Phase 0 context sync complete; Phase 1 preflight STOP-4: no actual device trace
+  or runnable Flutter/Dart located. No diagnostic patch/fixture acceptance yet.
+- No recognition fix, Phase 2, Build 20, main merge or new release authorized.
+- [Current state](../context/CURRENT_STATE.md),
+  [active contract](IMPORT_SCOPE_REDUCTION_SPEC.md),
+  [evidence gap and next action](BUILD19_DIAGNOSTIC_REVIEW.md).
+- Earlier acceptance-pending labels and launch ETAs below are historical, not
+  current readiness, schedule or permission. Store requirements must be reverified
+  at an eventual release gate.
+
+## Historical snapshot — 2026-08-18
 
 ## Executive Status
 

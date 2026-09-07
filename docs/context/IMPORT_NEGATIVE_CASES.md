@@ -1,3 +1,38 @@
+# Import negative cases
+
+## PX Mart
+
+Founder reports 12 products, 7 proposed regions, 0 Direct Import and 13
+classification records. Region Formation is the first observed count divergence,
+not proof that Detection or a particular anchor rule is the first cause.
+
+Suspects: price strings `88-`, `147.5.`, `69-`, `289.)`, `139.`, `169.`;
+identity corroboration, deduplication, row grouping. Do not tune these from guesses.
+Missing: actual OCR lines/coordinates, rejected anchors/reasons, crop OCR,
+region ownership and candidate/excluded mappings. 13 records != 13 products;
+the proposed 7+6 split is unproven. STOP-4; rule-level cause unknown.
+
+## Native PDF
+
+Founder reports 0 Direct Import, 111 confirmation records, 229 excluded records.
+Instruction describes Page 2: 16 cells, 14 ITEM labels, SEALY split across neighbors
+and MICHELIN mixed into SHARP. These are supplied prior findings, not a fresh replay.
+
+Current source confirms `DocumentUnderstandingPipeline.understand` checks Costco
+using page text via `_looksLikeCostcoPage`, then falls back to `_selectAnchors`
+which prioritizes ITEM anchors. Document adapter context is not used at that branch.
+`LocalImportService.analyzePdf` omits `merchantHint` from its returned
+`SourceAdaptiveImportResult`; model default is empty. This is independent of cell routing.
+
+Required: real Page 2 extraction fixture with extractor/version provenance,
+expected/actual SEALY and MICHELIN ownership, and merchant propagation trace.
+No claim that either defect alone explains all 111/229 records or fixes all recall.
+
+## Remote context preserved from e1775af (2026-08-23)
+
+Historical KPI/authorization statements below are superseded by the current scope.
+The real-user observations remain valid evidence and are not discarded.
+
 # Project Clover — Import Negative Cases
 
 Last updated: 2026-08-23

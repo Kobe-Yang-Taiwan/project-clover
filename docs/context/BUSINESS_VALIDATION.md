@@ -1,3 +1,42 @@
+# Business validation — planned, not implemented
+
+Outcome: users capture useful benefits, receive reminders and actually use value.
+North Star: Benefit Captured / Money Saved.
+
+Hypothesis: three critical fields plus quick confirmation can support activation
+without full Product Reconstruction. No user evidence yet establishes this.
+Future POC: existing image/photo/PDF capture; dense PDF Tap-first; show only Name,
+Expiration and Value. High prefilled; Medium candidate selection; Low quick recovery.
+Preserve evidence ownership and unknown values. Sale price is not money saved;
+user-selected reminder date is not a fabricated expiration date.
+
+Experiment after separate approval: >=5 image and >=5 PDF/coupon examples,
+including current failure families; >=20 attempts when practical. Predefine ground
+truth, timing start/end, action counting (including selection/save), failure handling
+and field-accuracy denominator. Score drafts BEFORE correction; report each field
+as well as aggregate accuracy. Do not discard failed attempts. This is a small
+directional POC, not statistical proof of market success.
+
+PASS: capture >=90%, draft accuracy >=90%, median actions <=3, median time <=15s,
+no typing >=80% (target >=90%), interaction judged acceptably easy.
+Conditional: capture 80–89% OR median actions 4–5 OR time 16–30s, with no FAIL
+criterion; allow only one targeted extraction or confirmation-UX improvement cycle.
+FAIL overrides conditional: capture <80%, median actions >5, median time >30s,
+or users consider it too much work. Escalate product/architecture, do not auto-tune.
+Other unmet gates remain non-PASS pending explicit review.
+
+Next only after POC: repeated use, reminder-to-redemption and actual savings.
+Existing mark-used functionality should be inspected/reused, not built twice.
+Future model planning only: Pending, Used, Expired, Missed; Original Benefit Value,
+Actual Money Saved, Avoided Loss, Redemption Time, Currency. Unknown amounts null.
+Expired means date passed/outcome unconfirmed; Missed means confirmed unused.
+No new dashboard, schema migration, monetization or distribution implementation now.
+
+## Remote context preserved from e1775af (2026-08-23)
+
+Historical KPI/authorization statements below are superseded by the current scope.
+The real-user observations remain valid evidence and are not discarded.
+
 # Project Clover — Business Validation
 
 ## Purpose

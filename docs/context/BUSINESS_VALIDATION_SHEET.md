@@ -1,3 +1,32 @@
+# Validation sheet
+
+All POC measurements are NOT MEASURED. No attempts have been supplied for this POC.
+
+| Metric | Planned target | Actual |
+|---|---|---|
+| Successful capture with reminder capability | >=90% | Unknown |
+| Critical-field draft accuracy | >=90% | Unknown |
+| Low-friction/no free-form typing | >=90%; experiment minimum 80% | Unknown |
+| Median human actions per benefit | <=3 | Unknown |
+| Median time per benefit | <=15 seconds | Unknown |
+| Review burden | Only three critical fields | Not tested |
+| Ease / blocking issues | Acceptably easy | Not tested |
+| Repeat use / redemption / savings | Next-stage validation | Not tested |
+
+Attempt record template (no fabricated rows): anonymous attempt ID, fixture hash,
+source type/page/region, app commit, device/extractor version, ground-truth reference,
+draft Name/Expiration/Value correctness and field confidence, final save result,
+reminder capability, elapsed seconds, actions, typing count, frustration/blocker
+notes, assisted/unassisted status. Keep user/source evidence local/private.
+
+See [protocol](BUSINESS_VALIDATION.md). Low-friction and no-typing measure the same
+interaction constraint here; do not count them as independent successes.
+
+## Remote context preserved from e1775af (2026-08-23)
+
+Historical KPI/authorization statements below are superseded by the current scope.
+The real-user observations remain valid evidence and are not discarded.
+
 # Project Clover — Business Validation Sheet
 
 ## Purpose

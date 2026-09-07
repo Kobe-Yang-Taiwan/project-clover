@@ -1,3 +1,41 @@
+# Decisions
+
+> CURRENT AUTHORITY — 2026-09-07: Founder authorized EXECUTE MODE for
+> **0.17.0+20 Simplified Playable MVP**. **REDUCE IMPORT AMBITION**.
+> Problem: benefits are forgotten, expire, and lose value. Outcome:
+> **Benefit Captured / Money Saved**. Current MVP: image Capture → Name /
+> Expiration / Value Draft → Confirm → local Save → Reminder.
+> Full Product Reconstruction and diagnostic root-cause completion are not
+> blocking requirements. Older no-Build-20 / diagnostic-first gates below are
+> historical and superseded. Existing negative cases remain unresolved.
+> Status: IMPLEMENTING; new QA/APK pending; Founder Test PENDING.
+> Next authorized task: finish targeted implementation, tests and Android build.
+> Current specification: docs/development/SIMPLIFIED_MVP_BUILD20.md.
+> Results: docs/development/BUILD20_EVIDENCE.md. No main merge authorized.
+
+## Reduce import ambition — Founder approved; context sync authorized 2026-09-05
+
+- Situation: Build 19 engineering passed; real image and native PDF imports failed.
+- Options: keep requiring complete reconstruction; reduce to useful critical drafts.
+- Decision: REDUCE IMPORT AMBITION. Full Product Reconstruction is not an MVP Gate.
+- Reason: users need low-effort capture and reminders, not catalogue cleanup.
+- Assumption to test: Name / Expiration / Value with quick confirmation is enough
+  for activation. This is not yet demonstrated by users.
+- Preserve: Local-first, native PDF text/layout, Structured Representation,
+  Evidence Ownership, Golden Dataset, storage/reminders, provider neutrality,
+  explicit consent before each cloud request, Unknown > fabricated value.
+- Future dense PDF interaction: Tap-first Capture; not implemented now.
+- Current authorization: Phase 0 documents and Phase 1 diagnostics only.
+- Explicitly withheld: accuracy fixes, Phase 2, Build 20, main merge.
+
+95% no-typing remains a long-term aspiration, not the sole MVP gate.
+North Star: Benefit Captured / Money Saved. See business validation for gates.
+
+## Remote context preserved from e1775af (2026-08-23)
+
+Historical KPI/authorization statements below are superseded by the current scope.
+The real-user observations remain valid evidence and are not discarded.
+
 # Project Clover — Durable Decisions
 
 Last updated: 2026-08-23

@@ -41,7 +41,9 @@ jobs:
         run: python3 tool/verify_cloud_secret_boundary.py
 
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib test
+        run: |
+          dart format lib test
+          git diff --exit-code -- lib test
 
       - name: Analyze
         run: flutter analyze
@@ -55,7 +57,7 @@ jobs:
       - name: Upload Android APK
         uses: actions/upload-artifact@v6
         with:
-          name: project-clover-build-19-local-image-poc-android-debug
+          name: project-clover-build-20-critical-draft-android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 14

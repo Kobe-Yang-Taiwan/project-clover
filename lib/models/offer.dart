@@ -126,7 +126,7 @@ class Offer {
     );
   }
 
-  static const supportedReminderDays = [1, 3, 7];
+  static const supportedReminderDays = [0, 1, 3, 7];
 
   final String id;
   final String name;

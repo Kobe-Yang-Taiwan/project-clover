@@ -6,6 +6,7 @@ import '../models/offer.dart';
 import '../models/offer_store.dart';
 import '../offer_reminder_service.dart';
 import 'coupon_import_models.dart';
+import 'critical_draft_screen.dart';
 import 'coupon_parser.dart';
 import 'local_import_service.dart';
 
@@ -31,15 +32,20 @@ class ImportChoiceSheet extends StatelessWidget {
               key: const Key('image-import-choice'),
               leading: const Icon(Icons.image_outlined),
               title: const Text('匯入圖片'),
-              subtitle: const Text('本機分析商品區域；漏抓時可點一下補回'),
+              subtitle: const Text('截圖或照片 → 名稱、到期日、折扣 → 儲存提醒'),
               onTap: () => Navigator.of(context).pop(ImportChoice.image),
             ),
             ListTile(
               key: const Key('pdf-import-choice'),
               leading: const Icon(Icons.picture_as_pdf_outlined),
-              title: const Text('匯入 PDF'),
-              subtitle: const Text('原生文字 PDF 留在本機；掃描頁另行詢問'),
+              title: const Text('匯入 PDF（舊版實驗功能）'),
+              subtitle: const Text('密集型錄建議先截取想要的優惠，再匯入圖片'),
               onTap: () => Navigator.of(context).pop(ImportChoice.pdf),
+            ),
+            ListTile(
+              leading: const Icon(Icons.fact_check_outlined),
+              title: const Text('本機匯入測試紀錄'),
+              onTap: () => Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => const CaptureRecordsScreen())),
             ),
           ],
         ),

@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import 'beta_support.dart';
 import 'import/coupon_import_models.dart';
+import 'import/critical_draft_screen.dart';
 import 'import/import_screens.dart';
 import 'import/local_import_service.dart';
 import 'models/offer.dart';
@@ -435,7 +436,7 @@ class _CloverHomeState extends State<CloverHome> {
       await Navigator.of(context).push<void>(
         MaterialPageRoute(
           builder: (_) => choice == ImportChoice.image
-              ? ImageImportScreen(
+              ? CriticalDraftScreen(
                   path: path,
                   service: widget.importService,
                   store: widget.store,
