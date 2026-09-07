@@ -33,7 +33,6 @@ abstract interface class OfferReminderInspector {
   Future<bool> hasPendingReminder(String offerId);
 }
 
-
 class NoopOfferReminderScheduler implements OfferReminderScheduler {
   const NoopOfferReminderScheduler();
 
@@ -54,7 +53,8 @@ class NoopOfferReminderScheduler implements OfferReminderScheduler {
   Future<void> cancel(String offerId) async {}
 }
 
-class AndroidOfferReminderScheduler implements OfferReminderScheduler, OfferReminderInspector {
+class AndroidOfferReminderScheduler
+    implements OfferReminderScheduler, OfferReminderInspector {
   AndroidOfferReminderScheduler._(this._notifications, this.initialOfferId);
 
   static const _details = NotificationDetails(
@@ -167,7 +167,11 @@ class AndroidOfferReminderScheduler implements OfferReminderScheduler, OfferRemi
   @override
   Future<bool> hasPendingReminder(String offerId) async {
     final pending = await _notifications.pendingNotificationRequests();
-    return pending.any((request) => request.id == notificationIdFor(offerId) && request.payload == offerId);
+    return pending.any(
+      (request) =>
+          request.id == notificationIdFor(offerId) &&
+          request.payload == offerId,
+    );
   }
 }
 

@@ -45,7 +45,9 @@ class ImportChoiceSheet extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.fact_check_outlined),
               title: const Text('本機匯入測試紀錄'),
-              onTap: () => Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => const CaptureRecordsScreen())),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(builder: (_) => const CaptureRecordsScreen()),
+              ),
             ),
           ],
         ),

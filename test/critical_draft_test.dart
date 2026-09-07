@@ -11,54 +11,122 @@ import 'package:project_clover/models/offer_storage.dart';
 import 'package:project_clover/models/offer_store.dart';
 import 'package:project_clover/offer_reminder_service.dart';
 
-OcrPageResult page(List<String> lines) => OcrPageResult(sourceType: ImportSourceType.image, pageNumber: null, text: lines.join('\n'), lines: lines, succeeded: true, duration: Duration.zero);
+OcrPageResult page(List<String> lines) => OcrPageResult(
+  sourceType: ImportSourceType.image,
+  pageNumber: null,
+  text: lines.join('\n'),
+  lines: lines,
+  succeeded: true,
+  duration: Duration.zero,
+);
 
 void main() {
   test('single benefit drafts only supported critical fields', () {
-    final draft = CriticalDraft.fromPage(page(['外送優惠券', '有效期限 2035-09-30', '折抵100元']));
+    final draft = CriticalDraft.fromPage(
+      page(['外送優惠券', '有效期限 2035-09-30', '折抵100元']),
+    );
     expect(draft.name.value, '外送優惠券');
     expect(draft.expiration.value, DateTime(2035, 9, 30));
     expect(draft.expiration.confidence, FieldConfidence.high);
     expect(draft.value.value, '折抵100元');
   });
 
-  test('unknown years prices item labels and legal text do not become facts', () {
-    final draft = CriticalDraft.fromPage(page(['ITEM 12345', '340gx3入/組', '商品實際品號以賣場陳列或官網為準。', '有效期限 9/30', r'$299']));
-    expect(draft.name.value, isNull);
-    expect(draft.name.candidates, isEmpty);
-    expect(draft.value.value, isNull);
-    expect(draft.expiration.value, isNull);
-  });
+  test(
+    'unknown years prices item labels and legal text do not become facts',
+    () {
+      final draft = CriticalDraft.fromPage(
+        page([
+          'ITEM 12345',
+          '340gx3入/組',
+          '商品實際品號以賣場陳列或官網為準。',
+          '有效期限 9/30',
+          r'$299',
+        ]),
+      );
+      expect(draft.name.value, isNull);
+      expect(draft.name.candidates, isEmpty);
+      expect(draft.value.value, isNull);
+      expect(draft.expiration.value, isNull);
+    },
+  );
 
-  test('multiple benefits require selection rather than cross-product auto merge', () {
-    final draft = CriticalDraft.fromPage(page(['咖啡優惠券', '飲料優惠券', '有效期限2035/9/30', '有效期限2035/10/31', '買一送一', '20% OFF']));
-    expect(draft.name.value, isNull);
-    expect(draft.value.value, isNull);
-    expect(draft.expiration.value, isNull);
-    expect(draft.name.candidates, hasLength(2));
-    expect(draft.value.candidates, hasLength(2));
-  });
+  test(
+    'multiple benefits require selection rather than cross-product auto merge',
+    () {
+      final draft = CriticalDraft.fromPage(
+        page([
+          '咖啡優惠券',
+          '飲料優惠券',
+          '有效期限2035/9/30',
+          '有效期限2035/10/31',
+          '買一送一',
+          '20% OFF',
+        ]),
+      );
+      expect(draft.name.value, isNull);
+      expect(draft.value.value, isNull);
+      expect(draft.expiration.value, isNull);
+      expect(draft.name.candidates, hasLength(2));
+      expect(draft.value.candidates, hasLength(2));
+    },
+  );
 
   test('manufacture dates are not expiration dates', () {
-    final draft = CriticalDraft.fromPage(page(['咖啡優惠券', '製造日期2035/9/1', '有效期限2035/9/30', '買一送一']));
+    final draft = CriticalDraft.fromPage(
+      page(['咖啡優惠券', '製造日期2035/9/1', '有效期限2035/9/30', '買一送一']),
+    );
     expect(draft.expiration.value, DateTime(2035, 9, 30));
   });
 
   test('same-day reminder persists without moving on later app launches', () {
     final now = DateTime(2035, 9, 30, 15, 30);
     final time = criticalDraftReminderTime(now, now);
-    final offer = Offer(id: 'today', name: '當日優惠', expiresAt: now, reminderDaysBefore: 0, reminderHour: time.hour, reminderMinute: time.minute);
-    final reopened = Offer.fromJson(jsonDecode(jsonEncode(offer.toJson())) as Map<String, dynamic>);
+    final offer = Offer(
+      id: 'today',
+      name: '當日優惠',
+      expiresAt: now,
+      reminderDaysBefore: 0,
+      reminderHour: time.hour,
+      reminderMinute: time.minute,
+    );
+    final reopened = Offer.fromJson(
+      jsonDecode(jsonEncode(offer.toJson())) as Map<String, dynamic>,
+    );
     expect(reopened.effectiveReminderAt, DateTime(2035, 9, 30, 15, 32));
-    expect(shouldScheduleOfferReminder(reopened, scheduledDate: reopened.effectiveReminderAt, now: now.add(const Duration(minutes: 3))), isFalse);
-    expect(criticalDraftReminderTime(DateTime(2035, 10, 2), now), DateTime(2035, 10, 1, 9));
+    expect(
+      shouldScheduleOfferReminder(
+        reopened,
+        scheduledDate: reopened.effectiveReminderAt,
+        now: now.add(const Duration(minutes: 3)),
+      ),
+      isFalse,
+    );
+    expect(
+      criticalDraftReminderTime(DateTime(2035, 10, 2), now),
+      DateTime(2035, 10, 1, 9),
+    );
   });
 
-  Future<void> open(WidgetTester tester, OfferStore store, TestReminders reminders, List<Map<String, dynamic>> records, {bool failure = false}) async {
-    await tester.pumpWidget(MaterialApp(home: CriticalDraftScreen(
-      path: '/fixture/coupon.png', service: DraftImportService(failure: failure), store: store, reminders: reminders,
-      recordAttempt: (record) async { records.add(record); },
-    )));
+  Future<void> open(
+    WidgetTester tester,
+    OfferStore store,
+    TestReminders reminders,
+    List<Map<String, dynamic>> records, {
+    bool failure = false,
+  }) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CriticalDraftScreen(
+          path: '/fixture/coupon.png',
+          service: DraftImportService(failure: failure),
+          store: store,
+          reminders: reminders,
+          recordAttempt: (record) async {
+            records.add(record);
+          },
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
   }
 
@@ -68,27 +136,36 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('draft save persists serialized offer and verifies scheduler state', (tester) async {
-    final storage = SerializedStorage();
-    final store = OfferStore(initialOffers: [], storage: storage);
-    final reminders = TestReminders();
-    final records = <Map<String, dynamic>>[];
-    await open(tester, store, reminders, records);
-    expect(find.textContaining('High'), findsOneWidget);
-    expect(find.textContaining('Needs Confirmation'), findsNothing);
-    await save(tester);
-    final reopened = await OfferStore.load(storage: storage);
-    expect(reopened.allOffers.single.name, '外送優惠券');
-    expect(reopened.allOffers.single.note, '折抵100元');
-    expect(reopened.allOffers.single.source, isEmpty);
-    expect(reminders.pending, contains(reopened.allOffers.single.id));
-    expect(find.textContaining('系統待發提醒已確認'), findsOneWidget);
-    expect(records.single['actions'], 1);
-    expect(records.single['freeFormTyping'], false);
-    expect(records.single['draftAccuracy'], {'name': null, 'expiration': null, 'value': null});
-  });
+  testWidgets(
+    'draft save persists serialized offer and verifies scheduler state',
+    (tester) async {
+      final storage = SerializedStorage();
+      final store = OfferStore(initialOffers: [], storage: storage);
+      final reminders = TestReminders();
+      final records = <Map<String, dynamic>>[];
+      await open(tester, store, reminders, records);
+      expect(find.textContaining('High'), findsOneWidget);
+      expect(find.textContaining('Needs Confirmation'), findsNothing);
+      await save(tester);
+      final reopened = await OfferStore.load(storage: storage);
+      expect(reopened.allOffers.single.name, '外送優惠券');
+      expect(reopened.allOffers.single.note, '折抵100元');
+      expect(reopened.allOffers.single.source, isEmpty);
+      expect(reminders.pending, contains(reopened.allOffers.single.id));
+      expect(find.textContaining('系統待發提醒已確認'), findsOneWidget);
+      expect(records.single['actions'], 1);
+      expect(records.single['freeFormTyping'], false);
+      expect(records.single['draftAccuracy'], {
+        'name': null,
+        'expiration': null,
+        'value': null,
+      });
+    },
+  );
 
-  testWidgets('denied notifications preserve benefit; retry never duplicates', (tester) async {
+  testWidgets('denied notifications preserve benefit; retry never duplicates', (
+    tester,
+  ) async {
     final store = OfferStore(initialOffers: [], storage: SerializedStorage());
     final reminders = TestReminders()..allowed = false;
     final records = <Map<String, dynamic>>[];
@@ -104,8 +181,13 @@ void main() {
     expect(reminders.pending, hasLength(1));
   });
 
-  testWidgets('failed storage does not schedule or report capture success', (tester) async {
-    final store = OfferStore(initialOffers: [], storage: SerializedStorage()..fail = true);
+  testWidgets('failed storage does not schedule or report capture success', (
+    tester,
+  ) async {
+    final store = OfferStore(
+      initialOffers: [],
+      storage: SerializedStorage()..fail = true,
+    );
     final reminders = TestReminders();
     final records = <Map<String, dynamic>>[];
     await open(tester, store, reminders, records);
@@ -116,7 +198,9 @@ void main() {
     expect(find.textContaining('儲存失敗'), findsOneWidget);
   });
 
-  testWidgets('OCR failure offers correction without fabricated defaults', (tester) async {
+  testWidgets('OCR failure offers correction without fabricated defaults', (
+    tester,
+  ) async {
     final store = OfferStore(initialOffers: []);
     await open(tester, store, TestReminders(), [], failure: true);
     expect(find.text('選擇到期日'), findsOneWidget);
@@ -130,7 +214,11 @@ class SerializedStorage implements OfferStorage {
   String? raw;
   bool fail = false;
   @override
-  Future<List<Offer>?> loadOffers() async => raw == null ? null : (jsonDecode(raw!) as List).map((value) => Offer.fromJson(value as Map<String, dynamic>)).toList();
+  Future<List<Offer>?> loadOffers() async => raw == null
+      ? null
+      : (jsonDecode(raw!) as List)
+            .map((value) => Offer.fromJson(value as Map<String, dynamic>))
+            .toList();
   @override
   Future<void> saveOffers(List<Offer> offers) async {
     if (fail) throw StateError('simulated disk failure');
@@ -146,13 +234,22 @@ class TestReminders implements OfferReminderScheduler, OfferReminderInspector {
   @override
   Future<bool> requestPermission() async => allowed;
   @override
-  Future<NotificationPermissionState> permissionState() async => allowed ? NotificationPermissionState.granted : NotificationPermissionState.denied;
+  Future<NotificationPermissionState> permissionState() async => allowed
+      ? NotificationPermissionState.granted
+      : NotificationPermissionState.denied;
   @override
-  Future<void> sync(Iterable<Offer> offers) async { pending.addAll(offers.map((offer) => offer.id)); }
+  Future<void> sync(Iterable<Offer> offers) async {
+    pending.addAll(offers.map((offer) => offer.id));
+  }
+
   @override
-  Future<void> cancel(String offerId) async { pending.remove(offerId); }
+  Future<void> cancel(String offerId) async {
+    pending.remove(offerId);
+  }
+
   @override
-  Future<bool> hasPendingReminder(String offerId) async => pending.contains(offerId);
+  Future<bool> hasPendingReminder(String offerId) async =>
+      pending.contains(offerId);
 }
 
 class DraftImportService implements CouponImportService {
@@ -167,6 +264,11 @@ class DraftImportService implements CouponImportService {
     if (failure) throw StateError('OCR unavailable');
     return page(['外送優惠券', '有效期限2035/09/30', '折抵100元']);
   }
+
   @override
-  Future<List<OcrPageResult>> recognizePdf(String path, {required void Function(ImportProgress progress) onProgress, required bool Function() isCancelled}) => throw UnimplementedError();
+  Future<List<OcrPageResult>> recognizePdf(
+    String path, {
+    required void Function(ImportProgress progress) onProgress,
+    required bool Function() isCancelled,
+  }) => throw UnimplementedError();
 }

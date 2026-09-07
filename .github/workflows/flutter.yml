@@ -14,7 +14,7 @@ concurrency:
 jobs:
   verify-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -60,4 +60,28 @@ jobs:
           name: project-clover-build-20-critical-draft-android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Enable Android emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify local capture persistence and pending Android notification
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 32
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash -o pipefail -c 'flutter test integration_test/critical_draft_device_test.dart --reporter expanded | tee build/device-smoke.log'
+
+      - name: Upload device evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: project-clover-build-20-device-evidence
+          path: build/device-smoke.log
+          if-no-files-found: ignore
           retention-days: 14
