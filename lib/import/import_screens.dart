@@ -1,0 +1,1273 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+
+import '../models/offer.dart';
+import '../models/offer_store.dart';
+import '../offer_reminder_service.dart';
+import 'coupon_import_models.dart';
+import 'critical_draft_screen.dart';
+import 'coupon_parser.dart';
+import 'local_import_service.dart';
+
+class ImportChoiceSheet extends StatelessWidget {
+  const ImportChoiceSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+        child: ListView(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          children: [
+            ListTile(
+              key: const Key('manual-entry-choice'),
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('手動輸入'),
+              subtitle: const Text('使用原本的新增優惠表單'),
+              onTap: () => Navigator.of(context).pop(ImportChoice.manual),
+            ),
+            ListTile(
+              key: const Key('image-import-choice'),
+              leading: const Icon(Icons.image_outlined),
+              title: const Text('匯入圖片'),
+              subtitle: const Text('截圖或照片 → 名稱、到期日、折扣 → 儲存提醒'),
+              onTap: () => Navigator.of(context).pop(ImportChoice.image),
+            ),
+            ListTile(
+              key: const Key('pdf-import-choice'),
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('匯入 PDF（舊版實驗功能）'),
+              subtitle: const Text('密集型錄建議先截取想要的優惠，再匯入圖片'),
+              onTap: () => Navigator.of(context).pop(ImportChoice.pdf),
+            ),
+            ListTile(
+              leading: const Icon(Icons.fact_check_outlined),
+              title: const Text('本機匯入測試紀錄'),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(builder: (_) => const CaptureRecordsScreen()),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum ImportChoice { manual, image, pdf }
+
+Future<bool> _requestCloudConsent(
+  BuildContext context, {
+  required String assetDescription,
+  required String disclosure,
+}) async {
+  final accepted = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      title: const Text('AI 智慧辨識'),
+      content: Text(
+        '為提高複雜廣告的辨識準確度，$assetDescription將傳送至 AI 服務進行分析。\n\n'
+        '已儲存的優惠券、提醒及其他 App 資料不會上傳。\n\n$disclosure\n\n'
+        '雲端結果仍會經過欄位證據與規則驗證，不會直接寫入優惠資料庫。',
+      ),
+      actions: [
+        TextButton(
+          key: const Key('decline-cloud-processing'),
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          key: const Key('accept-cloud-processing'),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('同意並開始辨識'),
+        ),
+      ],
+    ),
+  );
+  return accepted ?? false;
+}
+
+class ImageImportScreen extends StatefulWidget {
+  const ImageImportScreen({
+    required this.path,
+    required this.service,
+    required this.store,
+    required this.reminders,
+    this.parser = const CouponParser(),
+    super.key,
+  });
+
+  final String path;
+  final CouponImportService service;
+  final OfferStore store;
+  final OfferReminderScheduler reminders;
+  final CouponParser parser;
+
+  @override
+  State<ImageImportScreen> createState() => _ImageImportScreenState();
+}
+
+class _ImageImportScreenState extends State<ImageImportScreen> {
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    _process();
+  }
+
+  Future<void> _process() async {
+    SourceAdaptiveImportResult? adaptiveResult;
+    OcrPageResult? result;
+    if (widget.service case final SourceAdaptiveCouponImportService adaptive) {
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
+      adaptiveResult = await adaptive.analyzeImage(
+        widget.path,
+        allowCloudProcessing: false,
+      );
+      result = adaptiveResult.pages.isEmpty ? null : adaptiveResult.pages.first;
+    } else {
+      result = await widget.service.recognizeImage(widget.path);
+    }
+    if (!mounted) return;
+    final hasStructuredProducts = adaptiveResult?.products.isNotEmpty ?? false;
+    if ((result == null || !result.succeeded) && !hasStructuredProducts) {
+      setState(() => error = '無法辨識這張圖片，請換一張較清楚的圖片。');
+      return;
+    }
+    final parsed = adaptiveResult == null
+        ? widget.parser.parsePagesDetailed([result!])
+        : widget.parser.parseAdaptive(adaptiveResult);
+    if (parsed.candidates.isEmpty &&
+        widget.service is! SourceAdaptiveCouponImportService) {
+      setState(() => error = '圖片中沒有可供檢查的商品優惠。');
+      return;
+    }
+    final candidates = _markDuplicates(
+      parsed.candidates,
+      widget.store.allOffers,
+    );
+    await Navigator.of(context).pushReplacement<void, void>(
+      MaterialPageRoute(
+        builder: (_) => BatchReviewScreen(
+          candidates: candidates,
+          failedPages: 0,
+          qualityReport: parsed.report,
+          excludedCandidates: parsed.excludedCandidates,
+          processingNotice: _processingNotice(adaptiveResult),
+          imagePath: widget.path,
+          recoveryService: widget.service is SourceAdaptiveCouponImportService
+              ? widget.service as SourceAdaptiveCouponImportService
+              : null,
+          parser: widget.parser,
+          store: widget.store,
+          reminders: widget.reminders,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('檢查匯入內容')),
+      body: error != null
+          ? _ImportError(message: error!, onRetry: () => Navigator.pop(context))
+          : const _ImportLoading(label: '正在分析圖片中的商品區域…'),
+    );
+  }
+}
+
+class PdfImportScreen extends StatefulWidget {
+  const PdfImportScreen({
+    required this.path,
+    required this.service,
+    required this.store,
+    required this.reminders,
+    this.parser = const CouponParser(),
+    super.key,
+  });
+
+  final String path;
+  final CouponImportService service;
+  final OfferStore store;
+  final OfferReminderScheduler reminders;
+  final CouponParser parser;
+
+  @override
+  State<PdfImportScreen> createState() => _PdfImportScreenState();
+}
+
+class _PdfImportScreenState extends State<PdfImportScreen> {
+  ImportProgress progress = const ImportProgress(completed: 0, total: 1);
+  bool cancelled = false;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    _process();
+  }
+
+  Future<void> _process() async {
+    try {
+      SourceAdaptiveImportResult? adaptiveResult;
+      late final List<OcrPageResult> pages;
+      if (widget.service
+          case final SourceAdaptiveCouponImportService adaptive) {
+        final plan = await adaptive.inspectPdf(widget.path);
+        if (!mounted || cancelled) return;
+        final allowCloud = plan.requiresVision && adaptive.cloudVisionAvailable;
+        adaptiveResult = await adaptive.analyzePdf(
+          widget.path,
+          allowCloudProcessing: allowCloud,
+          requestCloudPageConsent: allowCloud
+              ? (pageNumber) async {
+                  if (!mounted || cancelled) return false;
+                  return _requestCloudConsent(
+                    context,
+                    assetDescription: '掃描 PDF 中實際需要分析的第 $pageNumber 頁',
+                    disclosure: adaptive.cloudVisionDisclosure,
+                  );
+                }
+              : null,
+          onProgress: (value) {
+            if (mounted) setState(() => progress = value);
+          },
+          isCancelled: () => cancelled,
+        );
+        pages = adaptiveResult.pages;
+      } else {
+        pages = await widget.service.recognizePdf(
+          widget.path,
+          onProgress: (value) {
+            if (mounted) setState(() => progress = value);
+          },
+          isCancelled: () => cancelled,
+        );
+      }
+      if (!mounted || cancelled) return;
+      final parsed = adaptiveResult == null
+          ? widget.parser.parsePagesDetailed(pages)
+          : widget.parser.parseAdaptive(adaptiveResult);
+      final candidates = _markDuplicates(
+        parsed.candidates,
+        widget.store.allOffers,
+      );
+      if (candidates.isEmpty) {
+        setState(() => error = 'PDF 中沒有可供檢查的優惠內容。');
+        return;
+      }
+      await Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute(
+          builder: (_) => BatchReviewScreen(
+            candidates: candidates,
+            failedPages: pages.where((page) => !page.succeeded).length,
+            qualityReport: parsed.report,
+            excludedCandidates: parsed.excludedCandidates,
+            processingNotice: _processingNotice(adaptiveResult),
+            store: widget.store,
+            reminders: widget.reminders,
+          ),
+        ),
+      );
+    } on ImportCancelledException {
+      if (mounted) Navigator.of(context).pop();
+    } on ImportLimitException catch (failure) {
+      if (mounted) setState(() => error = failure.message);
+    } on FormatException catch (failure) {
+      if (mounted) setState(() => error = failure.message);
+    } catch (_) {
+      if (mounted) setState(() => error = 'PDF 處理失敗，既有優惠沒有變更。');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = progress.total == 0 ? 1 : progress.total;
+    return Scaffold(
+      appBar: AppBar(title: const Text('處理 PDF')),
+      body: error != null
+          ? _ImportError(message: error!, onRetry: () => Navigator.pop(context))
+          : Center(
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress.completed / total,
+                    ),
+                    const SizedBox(height: 20),
+                    Text('正在分析第 ${progress.completed}／${progress.total} 頁'),
+                    const SizedBox(height: 8),
+                    const Text('原生文字頁留在本機；需要傳送掃描頁時會先取得同意。'),
+                    const SizedBox(height: 24),
+                    OutlinedButton(
+                      key: const Key('cancel-pdf-processing'),
+                      onPressed: () => setState(() => cancelled = true),
+                      child: const Text('取消處理'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+class CandidateEditor extends StatefulWidget {
+  const CandidateEditor({
+    required this.candidate,
+    required this.store,
+    required this.reminders,
+    this.imagePath,
+    this.onUpdated,
+    super.key,
+  });
+
+  final CouponCandidate candidate;
+  final String? imagePath;
+  final OfferStore store;
+  final OfferReminderScheduler reminders;
+  final ValueChanged<CouponCandidate>? onUpdated;
+
+  @override
+  State<CandidateEditor> createState() => _CandidateEditorState();
+}
+
+class _CandidateEditorState extends State<CandidateEditor> {
+  final formKey = GlobalKey<FormState>();
+  late final title = TextEditingController(text: widget.candidate.title);
+  late final merchant = TextEditingController(text: widget.candidate.merchant);
+  late final brand = TextEditingController(text: widget.candidate.brand);
+  late final description = TextEditingController(
+    text: widget.candidate.offerDescription,
+  );
+  late final originalPrice = TextEditingController(
+    text: widget.candidate.originalPrice?.toString() ?? '',
+  );
+  late final promotionalPrice = TextEditingController(
+    text: widget.candidate.promotionalPrice?.toString() ?? '',
+  );
+  late final conditions = TextEditingController(
+    text: widget.candidate.promotionConditions.join('、'),
+  );
+  late DateTime? expiration = widget.candidate.expirationDate;
+  late OfferCategory category = widget.candidate.category;
+  late bool reminderEnabled = widget.store.reminderDefaults.enabled;
+  bool attempted = false;
+  bool saving = false;
+  String? priceError;
+  String? promotionError;
+
+  @override
+  void dispose() {
+    title.dispose();
+    merchant.dispose();
+    brand.dispose();
+    description.dispose();
+    originalPrice.dispose();
+    promotionalPrice.dispose();
+    conditions.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+      key: formKey,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (widget.imagePath != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.file(
+                File(widget.imagePath!),
+                height: 180,
+                fit: BoxFit.contain,
+              ),
+            ),
+          const Card(
+            child: ListTile(
+              leading: Icon(Icons.privacy_tip_outlined),
+              title: Text('辨識結果不是正式資料'),
+              subtitle: Text('儲存前請務必核對；原始圖片不會存入優惠資料。'),
+            ),
+          ),
+          if (widget.candidate.needsReview)
+            Card(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: ListTile(
+                leading: const Icon(Icons.warning_amber_rounded),
+                title: const Text('需要你確認'),
+                subtitle: Text(widget.candidate.attentionFields.join('、')),
+              ),
+            ),
+          TextFormField(
+            key: const Key('import-title-field'),
+            controller: title,
+            decoration: _fieldDecoration('優惠名稱 *', '商品名稱'),
+            validator: (text) =>
+                text == null || text.trim().isEmpty ? '請輸入優惠名稱' : null,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: merchant,
+            key: const Key('import-merchant-field'),
+            decoration: _fieldDecoration('商家／來源 *', '商家'),
+            validator: (text) =>
+                text == null || text.trim().isEmpty ? '請確認商家／來源' : null,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: brand,
+            decoration: const InputDecoration(labelText: '品牌'),
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            key: const Key('import-expiry-field'),
+            onTap: _pickDate,
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: '到期日 *',
+                labelStyle: _isProblem('到期日')
+                    ? TextStyle(color: Theme.of(context).colorScheme.error)
+                    : null,
+                border: _isProblem('到期日')
+                    ? OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      )
+                    : null,
+                errorText: attempted && expiration == null ? '請確認到期日' : null,
+              ),
+              child: Text(expiration == null ? '尚未辨識，請選擇' : _date(expiration!)),
+            ),
+          ),
+          if (widget.candidate.alternativeDates.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '其他可能日期：${widget.candidate.alternativeDates.map(_date).join('、')}',
+              ),
+            ),
+          const SizedBox(height: 12),
+          TextFormField(
+            key: const Key('import-original-price-field'),
+            controller: originalPrice,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: '原價（未提供可留空）',
+              errorText: priceError,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            key: const Key('import-promotional-price-field'),
+            controller: promotionalPrice,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: _fieldDecoration(
+              '優惠價',
+              '優惠價',
+            ).copyWith(errorText: promotionError ?? priceError),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: conditions,
+            decoration: const InputDecoration(labelText: '優惠條件'),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<OfferCategory>(
+            initialValue: category,
+            decoration: const InputDecoration(labelText: '分類'),
+            items: <OfferCategory>{category, ...controlledOfferCategories}
+                .map(
+                  (item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(_category(item)),
+                  ),
+                )
+                .toList(),
+            onChanged: (item) {
+              if (item != null) setState(() => category = item);
+            },
+          ),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('到期提醒'),
+            subtitle: const Text('使用目前的全域提醒預設'),
+            value: reminderEnabled,
+            onChanged: (enabled) => setState(() => reminderEnabled = enabled),
+          ),
+          TextFormField(
+            controller: description,
+            maxLines: 3,
+            decoration: const InputDecoration(labelText: '優惠說明／備註'),
+          ),
+          ExpansionTile(
+            title: const Text('查看辨識原文'),
+            children: [
+              SelectableText(
+                widget.candidate.rawText.isEmpty
+                    ? '沒有辨識文字'
+                    : widget.candidate.rawText,
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            key: const Key('confirm-import-coupon'),
+            onPressed: saving ? null : _submit,
+            icon: saving
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check),
+            label: Text(widget.onUpdated == null ? '確認並建立優惠' : '套用修改'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final result = await showDatePicker(
+      context: context,
+      initialDate: expiration ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 10),
+      locale: const Locale('zh', 'TW'),
+    );
+    if (result != null) setState(() => expiration = result);
+  }
+
+  Future<void> _submit() async {
+    setState(() => attempted = true);
+    if (!(formKey.currentState?.validate() ?? false) || expiration == null)
+      return;
+    final parsedOriginal = _parseAmount(originalPrice.text);
+    final parsedPromotional = _parseAmount(
+      promotionalPrice.text.replaceAll(',', ''),
+    );
+    final parsedConditions = conditions.text
+        .split(RegExp(r'[、\n]'))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+    final invalidPositiveAmount =
+        (parsedOriginal != null && parsedOriginal <= 0) ||
+        (parsedPromotional != null && parsedPromotional <= 0);
+    final invalidRelationship =
+        parsedOriginal != null &&
+        parsedPromotional != null &&
+        parsedPromotional > parsedOriginal;
+    final missingPromotion =
+        parsedPromotional == null && parsedConditions.isEmpty;
+    if (invalidPositiveAmount || invalidRelationship || missingPromotion) {
+      setState(() {
+        priceError = invalidPositiveAmount
+            ? '價格必須大於 0'
+            : invalidRelationship
+            ? '優惠價不得高於原價'
+            : null;
+        promotionError = missingPromotion ? '請確認優惠價或優惠條件' : null;
+      });
+      return;
+    }
+    setState(() {
+      priceError = null;
+      promotionError = null;
+    });
+    final updated = widget.candidate.copyWith(
+      title: title.text.trim(),
+      merchant: merchant.text.trim(),
+      brand: brand.text.trim(),
+      expirationDate: expiration,
+      offerDescription: description.text.trim(),
+      originalPrice: parsedOriginal,
+      promotionalPrice: parsedPromotional,
+      clearOriginalPrice: originalPrice.text.trim().isEmpty,
+      clearPromotionalPrice: promotionalPrice.text.trim().isEmpty,
+      savings: parsedOriginal != null && parsedPromotional != null
+          ? parsedOriginal - parsedPromotional
+          : widget.candidate.savings,
+      clearSavings: parsedOriginal == null || parsedPromotional == null,
+      promotionConditions: parsedConditions,
+      category: category,
+      attentionFields: const [],
+      state: CandidateState.ready,
+      selected: true,
+    );
+    if (!updated.passesFinalValidation) {
+      setState(() => promotionError = '仍有關鍵資料未確認');
+      return;
+    }
+    if (widget.onUpdated != null) {
+      widget.onUpdated!(updated);
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() => saving = true);
+    try {
+      final offer = await widget.store.addOffer(
+        name: updated.title,
+        expiresAt: expiration!,
+        source: updated.merchant,
+        note: _note(updated),
+        reminderEnabled: reminderEnabled,
+        category: updated.category,
+      );
+      if (reminderEnabled) {
+        final granted = await widget.reminders.requestPermission();
+        if (granted) await widget.reminders.sync(widget.store.activeOffers);
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop(offer);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => saving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('匯入失敗，既有優惠沒有變更。')));
+    }
+  }
+
+  bool _isProblem(String field) =>
+      widget.candidate.attentionFields.any((reason) => reason.contains(field));
+
+  InputDecoration _fieldDecoration(String label, String field) =>
+      InputDecoration(
+        labelText: label,
+        labelStyle: _isProblem(field)
+            ? TextStyle(color: Theme.of(context).colorScheme.error)
+            : null,
+        enabledBorder: _isProblem(field)
+            ? OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              )
+            : null,
+      );
+}
+
+class BatchReviewScreen extends StatefulWidget {
+  const BatchReviewScreen({
+    required this.candidates,
+    required this.failedPages,
+    required this.store,
+    required this.reminders,
+    this.qualityReport,
+    this.excludedCandidates = const [],
+    this.imagePath,
+    this.processingNotice,
+    this.recoveryService,
+    this.parser = const CouponParser(),
+    super.key,
+  });
+
+  final List<CouponCandidate> candidates;
+  final int failedPages;
+  final OfferStore store;
+  final OfferReminderScheduler reminders;
+  final ImportQualityReport? qualityReport;
+  final List<CouponCandidate> excludedCandidates;
+  final String? imagePath;
+  final String? processingNotice;
+  final SourceAdaptiveCouponImportService? recoveryService;
+  final CouponParser parser;
+
+  @override
+  State<BatchReviewScreen> createState() => _BatchReviewScreenState();
+}
+
+class _BatchReviewScreenState extends State<BatchReviewScreen> {
+  late List<CouponCandidate> candidates = List.from(widget.candidates)
+    ..sort((a, b) {
+      if (a.needsReview != b.needsReview) return a.needsReview ? -1 : 1;
+      return a.id.compareTo(b.id);
+    });
+  bool needsReviewOnly = false;
+  bool saving = false;
+  bool recovering = false;
+  bool showProcessingNotice = true;
+  late List<CouponCandidate> excludedCandidates = List.from(
+    widget.excludedCandidates,
+  );
+  late ImportQualityReport? qualityReport = widget.qualityReport;
+  int recoveryActions = 0;
+
+  List<CouponCandidate> get visible => needsReviewOnly
+      ? candidates.where((candidate) => candidate.needsReview).toList()
+      : candidates;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = candidates.where((candidate) => candidate.selected).length;
+    final selectedNeedsReview = candidates
+        .where((candidate) => candidate.selected && candidate.needsReview)
+        .length;
+    return Scaffold(
+      appBar: AppBar(title: const Text('選擇要匯入的優惠')),
+      body: Column(
+        children: [
+          if (widget.processingNotice != null && showProcessingNotice)
+            MaterialBanner(
+              content: Text(widget.processingNotice!),
+              actions: [
+                TextButton(
+                  onPressed: () => setState(() => showProcessingNotice = false),
+                  child: const Text('知道了'),
+                ),
+              ],
+            ),
+          if (widget.failedPages > 0)
+            MaterialBanner(
+              content: Text('${widget.failedPages} 頁辨識失敗，其餘頁面仍可繼續檢查。'),
+              actions: [TextButton(onPressed: () {}, child: const Text('知道了'))],
+            ),
+          if (qualityReport != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '可直接匯入 ${candidates.where((item) => item.state == CandidateState.ready).length} 筆・'
+                  '需要確認 ${candidates.where((item) => item.state == CandidateState.needsReview).length} 筆・'
+                  '已排除 ${excludedCandidates.length} 筆'
+                  '${recoveryActions == 0 ? '' : '・已點選補回 $recoveryActions 次'}',
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                TextButton(
+                  onPressed: _selectDirectImport,
+                  child: const Text('選取可直接匯入'),
+                ),
+                TextButton(
+                  onPressed: () => _selectAll(false),
+                  child: const Text('全部取消'),
+                ),
+                FilterChip(
+                  label: const Text('只看需要確認'),
+                  selected: needsReviewOnly,
+                  onSelected: (value) =>
+                      setState(() => needsReviewOnly = value),
+                ),
+                if (excludedCandidates.isNotEmpty)
+                  TextButton(
+                    onPressed: _showExcluded,
+                    child: Text('查看已排除 ${excludedCandidates.length} 筆'),
+                  ),
+                if (widget.imagePath != null && widget.recoveryService != null)
+                  FilledButton.tonalIcon(
+                    key: const Key('recover-missing-product'),
+                    onPressed: recovering ? null : _recoverMissingProduct,
+                    icon: recovering
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.touch_app_outlined),
+                    label: const Text('少了一個商品？點一下圖片中的商品'),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: visible.length,
+              itemBuilder: (context, index) {
+                final candidate = visible[index];
+                return CheckboxListTile(
+                  key: Key('candidate-${candidate.id}'),
+                  value: candidate.selected,
+                  onChanged: (value) =>
+                      _replace(candidate.copyWith(selected: value ?? false)),
+                  title: Text(
+                    candidate.title.isEmpty ? '未辨識名稱' : candidate.title,
+                    style: candidate.needsReview
+                        ? TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontWeight: FontWeight.w700,
+                          )
+                        : null,
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        [
+                          if (candidate.merchant.isNotEmpty) candidate.merchant,
+                          if (candidate.expirationDate != null)
+                            '到期 ${_date(candidate.expirationDate!)}',
+                          if (candidate.sourcePage != null)
+                            '第 ${candidate.sourcePage} 頁',
+                          if (candidate.isBatchDuplicate ||
+                              candidate.isExistingDuplicate)
+                            '疑似重複',
+                        ].join('・'),
+                      ),
+                      if (candidate.needsReview)
+                        Text(
+                          candidate.attentionFields.join('、'),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                    ],
+                  ),
+                  secondary: IconButton(
+                    tooltip: '編輯',
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () => _edit(candidate),
+                  ),
+                );
+              },
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('已選擇 $selected 筆，其中 $selectedNeedsReview 筆需要確認'),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        key: const Key('batch-import-button'),
+                        onPressed: selected == 0 || saving
+                            ? null
+                            : _confirmImport,
+                        child: Text(
+                          selectedNeedsReview == 0
+                              ? '匯入 $selected 筆優惠'
+                              : '確認 $selectedNeedsReview 筆後匯入',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _selectAll(bool value) => setState(() {
+    candidates = candidates
+        .map((candidate) => candidate.copyWith(selected: value))
+        .toList();
+  });
+
+  void _selectDirectImport() => setState(() {
+    candidates = candidates
+        .map(
+          (candidate) => candidate.copyWith(
+            selected:
+                candidate.state == CandidateState.ready &&
+                !candidate.isBatchDuplicate &&
+                !candidate.isExistingDuplicate,
+          ),
+        )
+        .toList();
+  });
+
+  Future<void> _showExcluded() => showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: ListView(
+        children: [
+          const ListTile(
+            title: Text('已排除內容'),
+            subtitle: Text('這些片段不會被選取或匯入，可供檢查分類結果。'),
+          ),
+          for (final candidate in excludedCandidates)
+            ListTile(
+              title: Text(candidate.title.isEmpty ? '非商品內容' : candidate.title),
+              subtitle: Text(
+                candidate.rawText.isEmpty ? '沒有可用文字' : candidate.rawText,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: candidate.sourcePage == null
+                  ? null
+                  : Text('第 ${candidate.sourcePage} 頁'),
+            ),
+        ],
+      ),
+    ),
+  );
+
+  void _replace(CouponCandidate value) => setState(() {
+    final index = candidates.indexWhere(
+      (candidate) => candidate.id == value.id,
+    );
+    candidates[index] = value;
+  });
+
+  Future<void> _edit(CouponCandidate candidate) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('編輯候選優惠')),
+          body: CandidateEditor(
+            candidate: candidate,
+            imagePath: widget.imagePath,
+            store: widget.store,
+            reminders: widget.reminders,
+            onUpdated: _replace,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _recoverMissingProduct() async {
+    final path = widget.imagePath;
+    final service = widget.recoveryService;
+    if (path == null || service == null) return;
+    final location = await _pickImageLocation(context, path);
+    if (location == null || !mounted) return;
+    setState(() => recovering = true);
+    try {
+      final result = await service.recoverImageRegion(
+        path,
+        normalizedX: location.dx,
+        normalizedY: location.dy,
+      );
+      final parsed = widget.parser.parseAdaptive(result);
+      if (!mounted) return;
+      final recovered = _markDuplicates(
+        parsed.candidates,
+        widget.store.allOffers,
+      );
+      final unique = recovered.where((candidate) {
+        return !candidates.any(
+          (existing) =>
+              existing.title.trim().toLowerCase() ==
+                  candidate.title.trim().toLowerCase() &&
+              existing.merchant.trim().toLowerCase() ==
+                  candidate.merchant.trim().toLowerCase() &&
+              existing.promotionalPrice == candidate.promotionalPrice,
+        );
+      }).toList();
+      setState(() {
+        recoveryActions++;
+        candidates.addAll(unique);
+        candidates.sort((a, b) {
+          if (a.needsReview != b.needsReview) return a.needsReview ? -1 : 1;
+          return a.id.compareTo(b.id);
+        });
+        excludedCandidates.addAll(parsed.excludedCandidates);
+        recovering = false;
+      });
+      if (unique.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('這個區域尚未辨識出可用商品，請點商品名稱與價格附近再試。')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已自動補回 ${unique.length} 個商品區域，請確認標示欄位。')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => recovering = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('無法分析點選區域，未變更既有候選項目。')));
+    }
+  }
+
+  Future<void> _confirmImport() async {
+    var selected = candidates.where((candidate) => candidate.selected).toList();
+    final unresolved = selected
+        .where((candidate) => candidate.needsReview)
+        .toList();
+    for (var index = 0; index < unresolved.length; index++) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('還有 ${unresolved.length - index} 筆需要確認')),
+      );
+      await _edit(unresolved[index]);
+    }
+    selected = candidates.where((candidate) => candidate.selected).toList();
+    final invalid = selected
+        .where((candidate) => !candidate.passesFinalValidation)
+        .length;
+    if (invalid > 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('仍有 $invalid 筆關鍵資料未確認，尚未寫入或建立提醒。')),
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('匯入 ${selected.length} 張優惠？'),
+        content: const Text('確認後才會寫入手機，並依目前的提醒預設建立通知。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('返回檢查'),
+          ),
+          FilledButton(
+            key: const Key('confirm-batch-import'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('確認匯入'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => saving = true);
+    try {
+      await widget.store.addOffers(
+        selected
+            .map(
+              (candidate) => NewOfferData(
+                name: candidate.title,
+                expiresAt: candidate.expirationDate!,
+                source: candidate.merchant,
+                note: _note(candidate),
+                category: candidate.category,
+                requiresValidatedImport: true,
+              ),
+            )
+            .toList(),
+      );
+      final granted = await widget.reminders.requestPermission();
+      if (granted) await widget.reminders.sync(widget.store.activeOffers);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已匯入 ${selected.length} 張優惠')));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => saving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('批次匯入失敗，既有資料沒有變更。')));
+    }
+  }
+}
+
+Future<Offset?> _pickImageLocation(BuildContext context, String path) =>
+    showDialog<Offset>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('點一下漏掉的商品'),
+        content: SizedBox(
+          width: 520,
+          child: Builder(
+            builder: (imageContext) => GestureDetector(
+              key: const Key('missing-product-image'),
+              behavior: HitTestBehavior.opaque,
+              onTapUp: (details) {
+                final renderBox = imageContext.findRenderObject()! as RenderBox;
+                Navigator.of(context).pop(
+                  Offset(
+                    (details.localPosition.dx / renderBox.size.width)
+                        .clamp(0.0, 1.0)
+                        .toDouble(),
+                    (details.localPosition.dy / renderBox.size.height)
+                        .clamp(0.0, 1.0)
+                        .toDouble(),
+                  ),
+                );
+              },
+              child: Image.file(File(path), fit: BoxFit.contain),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+
+String? _processingNotice(SourceAdaptiveImportResult? result) {
+  if (result == null) return null;
+  if (result.cloudUsage.requestCount > 0) {
+    final cost = result.cloudUsage.estimatedCostUsd > 0
+        ? '；估計成本 US\$${result.cloudUsage.estimatedCostUsd.toStringAsFixed(4)}'
+        : '';
+    final tokens = result.cloudUsage.totalTokenCount > 0
+        ? '；Token ${result.cloudUsage.totalTokenCount}'
+        : '';
+    return '本次經同意使用雲端視覺 ${result.cloudUsage.requestCount} 次，'
+        '傳送 ${(result.cloudUsage.transmittedBytes / 1024).ceil()} KB$tokens$cost。';
+  }
+  if (result.cloudWasDeclined) {
+    return '你已選擇只用本機處理；多商品圖片或掃描頁的辨識效果可能較低。';
+  }
+  if (result.localFallbackUsed) {
+    return '雲端視覺未設定或無法使用，本次已改用本機辨識；結果可能需要較多確認。';
+  }
+  if (result.route == ImportRoute.promotionalImage) {
+    return '本次全程使用本機商品區域分析與逐區 OCR，未上傳圖片。'
+        '共提出 ${result.localImageMetrics.proposedRegionCount} 個區域。';
+  }
+  return 'Native-text PDF 已使用本機文字與版面解析，未上傳 PDF。';
+}
+
+class _ImportLoading extends StatelessWidget {
+  const _ImportLoading({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const CircularProgressIndicator(),
+        const SizedBox(height: 16),
+        Text(label),
+      ],
+    ),
+  );
+}
+
+class _ImportError extends StatelessWidget {
+  const _ImportError({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, size: 48),
+          const SizedBox(height: 12),
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 20),
+          FilledButton(onPressed: onRetry, child: const Text('重新選擇')),
+        ],
+      ),
+    ),
+  );
+}
+
+List<CouponCandidate> _markDuplicates(
+  List<CouponCandidate> values,
+  List<Offer> existing,
+) {
+  String fingerprint(
+    String title,
+    String merchant,
+    DateTime? date,
+    String value,
+  ) =>
+      '${title.trim().toLowerCase()}|${merchant.trim().toLowerCase()}|${date?.toIso8601String().split('T').first}|${value.trim().toLowerCase()}';
+  final seen = <String>{};
+  return values.map((candidate) {
+    final key = fingerprint(
+      candidate.title,
+      candidate.merchant,
+      candidate.expirationDate,
+      candidate.valueText,
+    );
+    final batchDuplicate =
+        key.replaceAll('|null|', '||').isNotEmpty && !seen.add(key);
+    final existingDuplicate = existing.any(
+      (
+        offer,
+      ) => fingerprint(offer.name, offer.source, offer.expiresAt, '').startsWith(
+        '${candidate.title.trim().toLowerCase()}|${candidate.merchant.trim().toLowerCase()}|${candidate.expirationDate?.toIso8601String().split('T').first}|',
+      ),
+    );
+    return candidate.copyWith(
+      selected: !(batchDuplicate || existingDuplicate),
+      isBatchDuplicate: batchDuplicate,
+      isExistingDuplicate: existingDuplicate,
+      state: batchDuplicate || existingDuplicate
+          ? CandidateState.needsReview
+          : candidate.state,
+      attentionFields: batchDuplicate || existingDuplicate
+          ? {...candidate.attentionFields, '疑似重複商品'}.toList()
+          : candidate.attentionFields,
+    );
+  }).toList();
+}
+
+String _note(CouponCandidate candidate) => [
+  if (candidate.originalPrice != null)
+    '原價：${candidate.originalPrice} 元'
+  else
+    '原價：未提供',
+  if (candidate.promotionalPrice != null) '優惠價：${candidate.promotionalPrice} 元',
+  if (candidate.savings != null) '共省：${candidate.savings} 元',
+  if (candidate.promotionConditions.isNotEmpty)
+    '優惠條件：${candidate.promotionConditions.join('、')}',
+  if (candidate.specification.isNotEmpty) '商品規格：${candidate.specification}',
+  if (candidate.brand.isNotEmpty) '品牌：${candidate.brand}',
+  if (candidate.itemNumber.isNotEmpty) 'ITEM：${candidate.itemNumber}',
+  if (candidate.offerDescription.isNotEmpty) candidate.offerDescription,
+].join('\n');
+
+String _date(DateTime value) =>
+    '${value.year}/${value.month.toString().padLeft(2, '0')}/${value.day.toString().padLeft(2, '0')}';
+
+num? _parseAmount(String text) {
+  final parsed = num.tryParse(text.replaceAll(',', '').trim());
+  if (parsed == null) return null;
+  return parsed is double && parsed == parsed.roundToDouble()
+      ? parsed.toInt()
+      : parsed;
+}
+
+String _category(OfferCategory value) => switch (value) {
+  OfferCategory.foodAndDrink => '食品飲料',
+  OfferCategory.freshAndChilled => '生鮮冷藏',
+  OfferCategory.dailyNecessities => '日用品',
+  OfferCategory.cleaningAndLaundry => '清潔洗衣',
+  OfferCategory.beautyAndCare => '美妝保養',
+  OfferCategory.health => '健康保健',
+  OfferCategory.appliances => '家電',
+  OfferCategory.electronics => '3C 通訊',
+  OfferCategory.homeLiving => '家居生活',
+  OfferCategory.fashion => '服飾鞋包',
+  OfferCategory.baby => '母嬰用品',
+  OfferCategory.pets => '寵物用品',
+  OfferCategory.automotiveAndOutdoor => '汽車戶外',
+  OfferCategory.diningVoucher => '餐飲票券',
+  OfferCategory.travelAndEntertainment => '旅遊娛樂',
+  OfferCategory.food => '餐飲',
+  OfferCategory.coffee => '咖啡',
+  OfferCategory.convenienceStore => '便利商店',
+  OfferCategory.departmentStore => '百貨',
+  OfferCategory.onlineShopping => '網路購物',
+  OfferCategory.entertainment => '娛樂',
+  OfferCategory.travel => '旅遊',
+  OfferCategory.transportation => '交通',
+  OfferCategory.others => '其他',
+};

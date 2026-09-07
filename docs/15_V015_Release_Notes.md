@@ -1,0 +1,27 @@
+# Project Clover V0.15.0（Build 15）Release Notes
+
+## Smart Universal Import
+
+- 圖片／截圖可辨識多個商品候選，不再固定一張圖片只建一張優惠。
+- PDF 與圖片保留文字座標，以 ITEM 或價格錨點建立商品區域。
+- 同一商品碎片保守合併；同品牌不同商品不會只因品牌相同而合併。
+- 商家與品牌分離，支援 Costco 好市多、全聯、家樂福、全家及 7-ELEVEN 文件脈絡。
+- 原價未提供即維持空值；不以平均價、組合價或滿額門檻反推原價。
+- 純價格、免責文字、活動標題、狀態列與導覽文字會被排除。
+
+## Faster review
+
+- 問題候選置頂並以紅字顯示原因。
+- `READY` 可預選；`NEEDS REVIEW` 與疑似重複不預選。
+- 使用者仍可選取問題候選，下一步只逐筆處理未解欄位。
+- 關鍵資料未確認前不會寫入資料庫或建立提醒。
+
+## Safety
+
+- 維持 Local-first，不加入雲端 OCR、LLM、追蹤或分析服務。
+- 取消與解析失敗不改變既有資料。
+- V0.8 起既有備份分類識別碼仍可還原。
+
+## Build validation
+
+GitHub Actions Run #82 已通過格式、Flutter Analyze、80 項自動測試及 Android Debug APK 建置。APK artifact 為 `project-clover-android-debug`（ID `9111299788`），SHA-256：`1ee1ac9b39dc95ca93c27c1242d9bda652ab9fb4d77f71ae19175a6244b4bb41`。

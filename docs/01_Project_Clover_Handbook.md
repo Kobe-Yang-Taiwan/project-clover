@@ -12,6 +12,8 @@
 
 人們不是沒有優惠，而是沒有能力持續管理分散在不同 App、訊息、截圖與紙本中的優惠。
 
+V0.15 Product Discovery 進一步確認：「手動輸入優惠券造成過多操作摩擦。」高候選數不是成功；目標是「一個真實商品＝一個有用候選」。100% 代表永久寫入資料正確，不代表通用 OCR 自動辨識率 100%。Universal Import 同時降低輸入時間與操作次數。
+
 ## 4. Target User
 
 第一版聚焦於 25～45 歲、經常替自己或家庭管理優惠券、票券、點數與會員權益的使用者。
@@ -42,6 +44,8 @@
 → 標記完成  
 → 獲得收藏或成長進度  
 → 下一次再次開啟 App
+
+V0.15 的產品價值鏈為：Universal Import → Correct Coupon Data → Reminder → My Day → Reduced Coupon Waste → Daily Habit → Future Gamification。遊戲化保留為未來策略，本版不實作。
 
 ## 8. MVP Success Definition
 

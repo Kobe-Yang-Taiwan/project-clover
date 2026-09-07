@@ -1,0 +1,76 @@
+name: Founder Gemini APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      proxy_endpoint:
+        description: HTTPS Clover proxy /v1/import/analyze endpoint
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  founder-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: founder-test
+    env:
+      CLOVER_VISION_ENDPOINT: ${{ inputs.proxy_endpoint }}
+      CLOVER_VISION_ACCESS_TOKEN: ${{ secrets.CLOVER_VISION_ACCESS_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Validate Founder provider configuration
+        shell: bash
+        run: |
+          [[ "$CLOVER_VISION_ENDPOINT" == https://* ]]
+          [[ -n "$CLOVER_VISION_ACCESS_TOKEN" ]]
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android platform files
+        run: flutter create --platforms=android --org tw.projectclover --project-name project_clover --no-pub .
+
+      - name: Configure Android notifications and network
+        run: python3 tool/configure_android_notifications.py
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Test Gemini proxy privacy and schema boundary
+        run: node --test proxy/test/*.test.mjs
+
+      - name: Verify provider secret boundary
+        run: python3 tool/verify_cloud_secret_boundary.py
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build provider-enabled Founder APK
+        shell: bash
+        run: |
+          flutter build apk --debug \
+            --dart-define=CLOVER_VISION_ENDPOINT="$CLOVER_VISION_ENDPOINT" \
+            --dart-define=CLOVER_VISION_ACCESS_TOKEN="$CLOVER_VISION_ACCESS_TOKEN" \
+            --dart-define=CLOVER_GEMINI_PAID_SERVICE=true
+
+      - name: Upload Founder Android APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: project-clover-build-18-gemini-founder-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

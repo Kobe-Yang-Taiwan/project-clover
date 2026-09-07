@@ -1,0 +1,13 @@
+{
+  "name": "project-clover-gemini-proxy",
+  "private": true,
+  "version": "0.16.1",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

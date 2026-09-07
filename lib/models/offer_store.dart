@@ -1,0 +1,651 @@
+import 'package:flutter/foundation.dart';
+
+import 'offer.dart';
+import 'offer_storage.dart';
+
+enum OfferFilter {
+  all,
+  expiringToday,
+  expiringWithinSevenDays,
+  expired,
+  completed,
+  reminderEnabled,
+  reminderDisabled,
+  favorites,
+}
+
+enum OfferSortOption {
+  expirationAscending,
+  expirationDescending,
+  createdNewest,
+  createdOldest,
+  recentlyModified,
+}
+
+enum ExpiredCleanupRange {
+  olderThan30Days(30),
+  olderThan90Days(90),
+  olderThanOneYear(365),
+  all(null);
+
+  const ExpiredCleanupRange(this.days);
+
+  final int? days;
+}
+
+class OfferDashboard {
+  const OfferDashboard({
+    required this.expiringToday,
+    required this.expiringWithinThreeDays,
+    required this.expiringWithinSevenDays,
+    required this.completed,
+    required this.total,
+    required this.nextExpiring,
+  });
+
+  final int expiringToday;
+  final int expiringWithinThreeDays;
+  final int expiringWithinSevenDays;
+  final int completed;
+  final int total;
+  final Offer? nextExpiring;
+}
+
+class MyDayDashboard {
+  const MyDayDashboard({
+    required this.recommendedToday,
+    required this.expiringToday,
+    required this.expiringTomorrow,
+    required this.mustUseThisWeek,
+  });
+
+  final Offer? recommendedToday;
+  final List<Offer> expiringToday;
+  final List<Offer> expiringTomorrow;
+  final List<Offer> mustUseThisWeek;
+}
+
+class NewOfferData {
+  const NewOfferData({
+    required this.name,
+    required this.expiresAt,
+    this.source = '',
+    this.note = '',
+    this.reminderEnabled,
+    this.reminderDaysBefore,
+    this.reminderHour,
+    this.reminderMinute,
+    this.isFavorite = false,
+    this.category = OfferCategory.others,
+    this.requiresValidatedImport = false,
+  });
+
+  final String name;
+  final DateTime expiresAt;
+  final String source;
+  final String note;
+  final bool? reminderEnabled;
+  final int? reminderDaysBefore;
+  final int? reminderHour;
+  final int? reminderMinute;
+  final bool isFavorite;
+  final OfferCategory category;
+  final bool requiresValidatedImport;
+}
+
+class OfferStore extends ChangeNotifier {
+  OfferStore({
+    List<Offer>? initialOffers,
+    OfferStorage? storage,
+    OfferSettingsStorage? settingsStorage,
+    ReminderDefaultsStorage? reminderDefaultsStorage,
+    OfferSortOption initialSortOption = OfferSortOption.expirationAscending,
+    ReminderDefaults initialReminderDefaults = const ReminderDefaults(),
+  }) : _offers = List<Offer>.from(initialOffers ?? _demoOffers()),
+       _storage = storage,
+       _settingsStorage = settingsStorage,
+       _reminderDefaultsStorage = reminderDefaultsStorage,
+       _sortOption = initialSortOption,
+       _reminderDefaults = initialReminderDefaults;
+
+  final List<Offer> _offers;
+  final OfferStorage? _storage;
+  final OfferSettingsStorage? _settingsStorage;
+  final ReminderDefaultsStorage? _reminderDefaultsStorage;
+  OfferSortOption _sortOption;
+  ReminderDefaults _reminderDefaults;
+
+  List<Offer> get allOffers => List<Offer>.unmodifiable(_offers);
+  OfferSortOption get sortOption => _sortOption;
+  ReminderDefaults get reminderDefaults => _reminderDefaults;
+
+  static Future<OfferStore> load({
+    OfferStorage? storage,
+    OfferSettingsStorage? settingsStorage,
+    ReminderDefaultsStorage? reminderDefaultsStorage,
+  }) async {
+    final persistence = storage ?? SharedPreferencesOfferStorage();
+    final sharedSettings = storage == null
+        ? SharedPreferencesOfferSettingsStorage()
+        : null;
+    final settings = settingsStorage ?? sharedSettings;
+    final reminderSettings = reminderDefaultsStorage ?? sharedSettings;
+    final savedOffers = await persistence.loadOffers();
+    final storedSort = await settings?.loadSortOption();
+    final defaults =
+        await reminderSettings?.loadReminderDefaults() ??
+        const ReminderDefaults();
+    final sortOption = OfferSortOption.values.firstWhere(
+      (option) => option.name == storedSort,
+      orElse: () => OfferSortOption.expirationAscending,
+    );
+    return OfferStore(
+      initialOffers: savedOffers,
+      storage: persistence,
+      settingsStorage: settings,
+      reminderDefaultsStorage: reminderSettings,
+      initialSortOption: sortOption,
+      initialReminderDefaults: defaults,
+    );
+  }
+
+  Future<void> setReminderDefaults(ReminderDefaults value) async {
+    final normalized = value.copyWith();
+    final previous = _reminderDefaults;
+    _reminderDefaults = normalized;
+    notifyListeners();
+    try {
+      await _reminderDefaultsStorage?.saveReminderDefaults(normalized);
+    } catch (_) {
+      _reminderDefaults = previous;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> setSortOption(OfferSortOption value) async {
+    if (_sortOption == value) return;
+    final previous = _sortOption;
+    _sortOption = value;
+    notifyListeners();
+    try {
+      await _settingsStorage?.saveSortOption(value.name);
+    } catch (_) {
+      _sortOption = previous;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  List<Offer> queryOffers({
+    String query = '',
+    OfferFilter filter = OfferFilter.all,
+    OfferSortOption? sort,
+    DateTime? now,
+    OfferCategory? category,
+  }) {
+    final today = _dateOnly(now ?? DateTime.now());
+    final keyword = query.trim().toLowerCase();
+    final results = _offers.where((offer) {
+      final matchesSearch =
+          keyword.isEmpty ||
+          offer.name.toLowerCase().contains(keyword) ||
+          offer.source.toLowerCase().contains(keyword) ||
+          offer.note.toLowerCase().contains(keyword);
+      if (!matchesSearch) return false;
+      if (category != null && offer.category != category) return false;
+
+      final expiry = _dateOnly(offer.expiresAt);
+      final days = expiry.difference(today).inDays;
+      return switch (filter) {
+        OfferFilter.all => true,
+        OfferFilter.expiringToday => !offer.isCompleted && days == 0,
+        OfferFilter.expiringWithinSevenDays =>
+          !offer.isCompleted && days >= 0 && days <= 7,
+        OfferFilter.expired => !offer.isCompleted && days < 0,
+        OfferFilter.completed => offer.isCompleted,
+        OfferFilter.reminderEnabled =>
+          !offer.isCompleted && offer.reminderEnabled,
+        OfferFilter.reminderDisabled =>
+          !offer.isCompleted && !offer.reminderEnabled,
+        OfferFilter.favorites => offer.isFavorite,
+      };
+    }).toList();
+    _sortOffers(results, sort ?? _sortOption);
+    return List<Offer>.unmodifiable(results);
+  }
+
+  MyDayDashboard myDay({DateTime? now}) {
+    final today = _dateOnly(now ?? DateTime.now());
+    final active = _offers.where((offer) => !offer.isCompleted).toList();
+    int daysUntil(Offer offer) =>
+        _dateOnly(offer.expiresAt).difference(today).inDays;
+    List<Offer> forDay(int day) =>
+        active.where((offer) => daysUntil(offer) == day).toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+    final upcoming = active.where((offer) => daysUntil(offer) >= 0).toList()
+      ..sort((a, b) {
+        final favorite = (b.isFavorite ? 1 : 0).compareTo(a.isFavorite ? 1 : 0);
+        if (favorite != 0) return favorite;
+        final expiry = a.expiresAt.compareTo(b.expiresAt);
+        return expiry == 0 ? a.id.compareTo(b.id) : expiry;
+      });
+    final week =
+        active
+            .where((offer) => daysUntil(offer) >= 2 && daysUntil(offer) <= 7)
+            .toList()
+          ..sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
+    return MyDayDashboard(
+      recommendedToday: upcoming.firstOrNull,
+      expiringToday: List.unmodifiable(forDay(0)),
+      expiringTomorrow: List.unmodifiable(forDay(1)),
+      mustUseThisWeek: List.unmodifiable(week),
+    );
+  }
+
+  OfferDashboard dashboard({DateTime? now}) {
+    final today = _dateOnly(now ?? DateTime.now());
+    final active = _offers.where((offer) => !offer.isCompleted).toList();
+    int within(int days) => active.where((offer) {
+      final difference = _dateOnly(offer.expiresAt).difference(today).inDays;
+      return difference >= 0 && difference <= days;
+    }).length;
+    final upcoming =
+        active
+            .where((offer) => !_dateOnly(offer.expiresAt).isBefore(today))
+            .toList()
+          ..sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
+    return OfferDashboard(
+      expiringToday: within(0),
+      expiringWithinThreeDays: within(3),
+      expiringWithinSevenDays: within(7),
+      completed: _offers.where((offer) => offer.isCompleted).length,
+      total: _offers.length,
+      nextExpiring: upcoming.firstOrNull,
+    );
+  }
+
+  void _sortOffers(List<Offer> offers, OfferSortOption option) {
+    int stable(Offer a, Offer b) => a.id.compareTo(b.id);
+    offers.sort((a, b) {
+      final comparison = switch (option) {
+        OfferSortOption.expirationAscending => a.expiresAt.compareTo(
+          b.expiresAt,
+        ),
+        OfferSortOption.expirationDescending => b.expiresAt.compareTo(
+          a.expiresAt,
+        ),
+        OfferSortOption.createdNewest => _activityDate(
+          b,
+          created: true,
+        ).compareTo(_activityDate(a, created: true)),
+        OfferSortOption.createdOldest => _activityDate(
+          a,
+          created: true,
+        ).compareTo(_activityDate(b, created: true)),
+        OfferSortOption.recentlyModified => _activityDate(
+          b,
+        ).compareTo(_activityDate(a)),
+      };
+      return comparison == 0 ? stable(a, b) : comparison;
+    });
+  }
+
+  DateTime _activityDate(Offer offer, {bool created = false}) {
+    if (created)
+      return offer.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return offer.updatedAt ??
+        offer.createdAt ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  List<Offer> get activeOffers {
+    final offers = _offers.where((offer) => !offer.isCompleted).toList();
+    offers.sort((a, b) => a.expiresAt.compareTo(b.expiresAt));
+    return List<Offer>.unmodifiable(offers);
+  }
+
+  List<Offer> get completedOffers {
+    final offers = _offers.where((offer) => offer.isCompleted).toList();
+    offers.sort((a, b) {
+      final aCompleted = a.completedAt;
+      final bCompleted = b.completedAt;
+      if (aCompleted != null && bCompleted != null) {
+        return bCompleted.compareTo(aCompleted);
+      }
+      if (aCompleted != null) return -1;
+      if (bCompleted != null) return 1;
+      return b.expiresAt.compareTo(a.expiresAt);
+    });
+    return List<Offer>.unmodifiable(offers);
+  }
+
+  int expiringWithinDays(int days, {DateTime? now}) {
+    final today = _dateOnly(now ?? DateTime.now());
+    final end = today.add(Duration(days: days));
+    return activeOffers.where((offer) {
+      final expiry = _dateOnly(offer.expiresAt);
+      return !expiry.isBefore(today) && !expiry.isAfter(end);
+    }).length;
+  }
+
+  Future<Offer> addOffer({
+    required String name,
+    required DateTime expiresAt,
+    String source = '',
+    String note = '',
+    bool? reminderEnabled,
+    int? reminderDaysBefore,
+    int? reminderHour,
+    int? reminderMinute,
+    bool isFavorite = false,
+    OfferCategory category = OfferCategory.others,
+  }) async {
+    final now = DateTime.now();
+    final offer = Offer(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      name: name.trim(),
+      expiresAt: expiresAt,
+      source: source.trim(),
+      note: note.trim(),
+      reminderEnabled: reminderEnabled ?? _reminderDefaults.enabled,
+      reminderDaysBefore: normalizeReminderDays(
+        reminderDaysBefore ?? _reminderDefaults.daysBefore,
+      ),
+      reminderHour: reminderHour ?? _reminderDefaults.hour,
+      reminderMinute: reminderMinute ?? _reminderDefaults.minute,
+      createdAt: now,
+      updatedAt: now,
+      isFavorite: isFavorite,
+      category: category,
+    );
+    _offers.add(offer);
+    try {
+      await _persist();
+    } catch (_) {
+      _offers.remove(offer);
+      rethrow;
+    }
+    notifyListeners();
+    return offer;
+  }
+
+  Future<List<Offer>> addOffers(List<NewOfferData> values) async {
+    if (values.isEmpty) return const [];
+    if (values.any(
+      (value) =>
+          value.requiresValidatedImport &&
+          (value.name.trim().isEmpty || value.source.trim().isEmpty),
+    )) {
+      throw const FormatException('匯入資料仍有未確認的關鍵欄位');
+    }
+    final previous = List<Offer>.from(_offers);
+    final now = DateTime.now();
+    final created = <Offer>[];
+    for (var index = 0; index < values.length; index++) {
+      final value = values[index];
+      final offer = Offer(
+        id: '${now.microsecondsSinceEpoch}-$index',
+        name: value.name.trim(),
+        expiresAt: value.expiresAt,
+        source: value.source.trim(),
+        note: value.note.trim(),
+        reminderEnabled: value.reminderEnabled ?? _reminderDefaults.enabled,
+        reminderDaysBefore: normalizeReminderDays(
+          value.reminderDaysBefore ?? _reminderDefaults.daysBefore,
+        ),
+        reminderHour: value.reminderHour ?? _reminderDefaults.hour,
+        reminderMinute: value.reminderMinute ?? _reminderDefaults.minute,
+        createdAt: now,
+        updatedAt: now,
+        isFavorite: value.isFavorite,
+        category: value.category,
+      );
+      created.add(offer);
+      _offers.add(offer);
+    }
+    try {
+      await _persist();
+    } catch (_) {
+      _offers
+        ..clear()
+        ..addAll(previous);
+      rethrow;
+    }
+    notifyListeners();
+    return List<Offer>.unmodifiable(created);
+  }
+
+  Future<void> updateOffer({
+    required String id,
+    required String name,
+    required DateTime expiresAt,
+    String source = '',
+    String note = '',
+    bool reminderEnabled = true,
+    int reminderDaysBefore = 1,
+    int reminderHour = 9,
+    int reminderMinute = 0,
+    bool? isFavorite,
+    OfferCategory? category,
+  }) async {
+    final index = _offers.indexWhere((offer) => offer.id == id);
+    if (index == -1) throw StateError('Offer not found');
+
+    final previous = _offers[index];
+    _offers[index] = previous.copyWith(
+      name: name.trim(),
+      expiresAt: expiresAt,
+      source: source.trim(),
+      note: note.trim(),
+      reminderEnabled: reminderEnabled,
+      reminderDaysBefore: normalizeReminderDays(reminderDaysBefore),
+      reminderHour: reminderHour,
+      reminderMinute: reminderMinute,
+      updatedAt: DateTime.now(),
+      isFavorite: isFavorite,
+      category: category,
+    );
+    try {
+      await _persist();
+    } catch (_) {
+      _offers[index] = previous;
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> toggleFavorite(String id) async {
+    final index = _offers.indexWhere((offer) => offer.id == id);
+    if (index == -1) return;
+    final previous = _offers[index];
+    _offers[index] = previous.copyWith(
+      isFavorite: !previous.isFavorite,
+      updatedAt: DateTime.now(),
+    );
+    try {
+      await _persist();
+    } catch (_) {
+      _offers[index] = previous;
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteOffers(Set<String> ids) => _batchUpdate(
+    (offers) => offers.removeWhere((offer) => ids.contains(offer.id)),
+  );
+
+  List<Offer> expiredOffersForCleanup(
+    ExpiredCleanupRange range, {
+    DateTime? now,
+  }) {
+    final today = _dateOnly(now ?? DateTime.now());
+    return List<Offer>.unmodifiable(
+      _offers.where((offer) {
+        if (offer.isCompleted) return false;
+        final expiry = _dateOnly(offer.expiresAt);
+        final days = range.days;
+        return days == null
+            ? expiry.isBefore(today)
+            : expiry.isBefore(today.subtract(Duration(days: days)));
+      }),
+    );
+  }
+
+  Future<int> cleanupExpiredOffers(
+    ExpiredCleanupRange range, {
+    DateTime? now,
+  }) async {
+    final ids = expiredOffersForCleanup(
+      range,
+      now: now,
+    ).map((offer) => offer.id).toSet();
+    if (ids.isEmpty) return 0;
+    await deleteOffers(ids);
+    return ids.length;
+  }
+
+  Future<void> markOffersCompleted(Set<String> ids, {DateTime? completedAt}) =>
+      _batchUpdate((offers) {
+        final now = completedAt ?? DateTime.now();
+        for (var index = 0; index < offers.length; index++) {
+          final offer = offers[index];
+          if (ids.contains(offer.id) && !offer.isCompleted) {
+            offers[index] = offer.copyWith(
+              status: OfferStatus.completed,
+              completedAt: now,
+              updatedAt: now,
+            );
+          }
+        }
+      });
+
+  Future<void> restoreOffers(Set<String> ids) => _batchUpdate((offers) {
+    final now = DateTime.now();
+    for (var index = 0; index < offers.length; index++) {
+      final offer = offers[index];
+      if (ids.contains(offer.id) && offer.isCompleted) {
+        offers[index] = offer.copyWith(
+          status: OfferStatus.active,
+          clearCompletedAt: true,
+          updatedAt: now,
+        );
+      }
+    }
+  });
+
+  Future<void> _batchUpdate(void Function(List<Offer>) update) async {
+    final previous = List<Offer>.from(_offers);
+    update(_offers);
+    try {
+      await _persist();
+    } catch (_) {
+      _offers
+        ..clear()
+        ..addAll(previous);
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteOffer(String id) async {
+    final index = _offers.indexWhere((offer) => offer.id == id);
+    if (index == -1) return;
+
+    final removed = _offers.removeAt(index);
+    try {
+      await _persist();
+    } catch (_) {
+      _offers.insert(index, removed);
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> markCompleted(String id, {DateTime? completedAt}) async {
+    final index = _offers.indexWhere((offer) => offer.id == id);
+    if (index == -1 || _offers[index].isCompleted) return;
+
+    final previous = _offers[index];
+    _offers[index] = previous.copyWith(
+      status: OfferStatus.completed,
+      completedAt: completedAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    try {
+      await _persist();
+    } catch (_) {
+      _offers[index] = previous;
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> restoreOffer(String id) async {
+    final index = _offers.indexWhere((offer) => offer.id == id);
+    if (index == -1 || !_offers[index].isCompleted) return;
+
+    final previous = _offers[index];
+    _offers[index] = previous.copyWith(
+      status: OfferStatus.active,
+      clearCompletedAt: true,
+      updatedAt: DateTime.now(),
+    );
+    try {
+      await _persist();
+    } catch (_) {
+      _offers[index] = previous;
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> replaceAll(Iterable<Offer> offers) async {
+    final previous = List<Offer>.from(_offers);
+    _offers
+      ..clear()
+      ..addAll(offers);
+    try {
+      await _persist();
+    } catch (_) {
+      _offers
+        ..clear()
+        ..addAll(previous);
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<void> _persist() async {
+    await _storage?.saveOffers(List<Offer>.unmodifiable(_offers));
+  }
+
+  static DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  static List<Offer> _demoOffers() {
+    final today = _dateOnly(DateTime.now());
+    return [
+      Offer(
+        id: 'coffee',
+        name: '超商大杯拿鐵兌換券',
+        source: '便利商店 App',
+        note: '上班前順路使用',
+        expiresAt: today,
+      ),
+      Offer(
+        id: 'movie',
+        name: '電影票買一送一',
+        source: '信用卡優惠',
+        expiresAt: today.add(const Duration(days: 2)),
+      ),
+      Offer(
+        id: 'shopping',
+        name: '百貨公司 200 元折價券',
+        source: '會員 App',
+        expiresAt: today.add(const Duration(days: 6)),
+      ),
+    ];
+  }
+}
