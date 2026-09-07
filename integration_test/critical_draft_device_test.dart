@@ -78,7 +78,7 @@ void main() {
     final records = await CaptureRecords.read();
     expect(records.last['success'], isTrue);
     expect(records.last['reminder'], 'pending_verified');
-    print('CLOVER_DEVICE_EVIDENCE ${jsonEncode({
+    debugPrint('CLOVER_DEVICE_EVIDENCE ${jsonEncode({
       'fixture': 'synthetic raster; no real-user data',
       'ocr': 'Android ML Kit local',
       'saved': offer.toJson(),

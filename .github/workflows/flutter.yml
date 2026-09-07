@@ -23,6 +23,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.47.2'
           cache: true
 
       - name: Generate Android platform files
@@ -33,6 +34,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Record resolved dependencies
+        run: cat pubspec.lock
 
       - name: Test Gemini proxy privacy and schema boundary
         run: node --test proxy/test/*.test.mjs
