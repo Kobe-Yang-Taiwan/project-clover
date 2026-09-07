@@ -41,11 +41,10 @@ class CriticalDraft {
       caseSensitive: false,
     );
     for (final line in lines) {
-      for (final match in discount.allMatches(line)) {
-        // Preserve a short qualifying line (e.g. minimum spend); extracting
-        // only the amount would change the benefit's meaning.
-        final value = line.length <= 80 ? line : match.group(0)!.trim();
-        if (!values.contains(value)) values.add(value);
+      // Keep qualifying text such as minimum spend. Long, unclear terms need
+      // correction, not an amount stripped of its conditions.
+      if (line.length <= 80 && discount.hasMatch(line) && !values.contains(line)) {
+        values.add(line);
       }
       // Dates without a year remain unknown. Do not mistake manufacture dates
       // for expiration, or silently select between unrelated coupon dates.

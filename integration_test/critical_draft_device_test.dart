@@ -59,7 +59,11 @@ void main() {
     expect(name.controller!.text, 'Coffee Coupon');
     expect(value.controller!.text, '20% OFF');
     expect(find.text('2035-09-30'), findsWidgets);
-    await tester.ensureVisible(find.byKey(const Key('save-critical-draft')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('save-critical-draft')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.byKey(const Key('save-critical-draft')));
     for (var count = 0; count < 100; count++) {
       await tester.pump(const Duration(milliseconds: 100));

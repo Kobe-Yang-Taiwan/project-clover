@@ -271,6 +271,7 @@ class _CriticalDraftScreenState extends State<CriticalDraftScreen> {
                     Text('優惠名稱 · ${_confidence(draft.name.confidence)}'),
                     TextField(
                       key: const Key('draft-name'),
+                      enabled: !_busy,
                       controller: _name,
                       onChanged: (_) => _typing('name'),
                       decoration: const InputDecoration(hintText: '優惠名稱'),
@@ -282,6 +283,7 @@ class _CriticalDraftScreenState extends State<CriticalDraftScreen> {
                             (name) => ActionChip(
                               label: Text(name),
                               onPressed: () {
+                                if (_busy) return;
                                 _actions++;
                                 setState(() => _name.text = name);
                               },
@@ -293,7 +295,7 @@ class _CriticalDraftScreenState extends State<CriticalDraftScreen> {
                     Text('到期日 · ${_confidence(draft.expiration.confidence)}'),
                     OutlinedButton(
                       key: const Key('draft-date'),
-                      onPressed: _chooseDate,
+                      onPressed: _busy ? null : _chooseDate,
                       child: Text(
                         _expiration == null ? '選擇到期日' : draftDate(_expiration!),
                       ),
@@ -305,6 +307,7 @@ class _CriticalDraftScreenState extends State<CriticalDraftScreen> {
                             (date) => ActionChip(
                               label: Text(draftDate(date)),
                               onPressed: () {
+                                if (_busy) return;
                                 _actions++;
                                 setState(() => _expiration = date);
                               },
@@ -316,6 +319,7 @@ class _CriticalDraftScreenState extends State<CriticalDraftScreen> {
                     Text('價值／折扣 · ${_confidence(draft.value.confidence)}'),
                     TextField(
                       key: const Key('draft-value'),
+                      enabled: !_busy,
                       controller: _value,
                       onChanged: (_) => _typing('value'),
                       decoration: const InputDecoration(
@@ -329,6 +333,7 @@ class _CriticalDraftScreenState extends State<CriticalDraftScreen> {
                             (value) => ActionChip(
                               label: Text(value),
                               onPressed: () {
+                                if (_busy) return;
                                 _actions++;
                                 setState(() => _value.text = value);
                               },

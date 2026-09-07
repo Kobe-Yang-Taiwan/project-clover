@@ -18,8 +18,9 @@ class ImportChoiceSheet extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: ListView(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
           children: [
             ListTile(
               key: const Key('manual-entry-choice'),

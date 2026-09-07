@@ -15,7 +15,7 @@
 
 _Current status updated: 2026-09-05; historical snapshot below retained._
 
-## Active status — overrides historical snapshot below
+## Historical diagnostic status — 2026-09-05, superseded
 
 - Build 19 engineering PASS (historical); Founder Test FAIL (Founder reported).
 - REDUCE IMPORT AMBITION: full reconstruction is not an MVP Gate.

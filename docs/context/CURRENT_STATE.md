@@ -13,28 +13,28 @@
 > Current specification: docs/development/SIMPLIFIED_MVP_BUILD20.md.
 > Results: docs/development/BUILD20_EVIDENCE.md. No main merge authorized.
 
-Updated: 2026-09-05. Authority: Founder import-scope-reduction instruction and
-explicit approval to resume Phase 0 followed by diagnostic-only Phase 1.
+Updated: 2026-09-07. Authority: Founder Simplified MVP Playable Build, EXECUTE MODE.
 
-- Version: 0.16.1+19; branch: `agent/flutter-prototype-v0`.
-- Inspected baseline: `133ef0ec1eb7979bcad4e215554439d070135623`.
-- Historical engineering baseline: 131/131 Flutter tests and Actions #99 PASS;
-  see `../27_V016R_Release_Notes.md`. Not a new test run.
-- Founder product result: FAIL, supplied by Founder; see
-  [evidence](FOUNDER_TEST_EVIDENCE.md). Engineering PASS != Product PASS.
-- Phase 0: six context files created and development direction synchronized.
-- Phase 1: read-only preflight performed; STOP-4, actual device trace unavailable
-  and Flutter/Dart executable not found in PATH or searched workspace/tool paths.
-  Instrumentation and executable failing fixtures are NOT complete.
-- Current gate: BUILD 19 DIAGNOSTIC REVIEW / BLOCKED.
-- No recognition changes, new APK, Build 20, Phase 2, cloud upload or main merge.
-- Baseline is an engineering checkpoint, NOT a product-accepted LKG.
+- Build target: 0.17.0+20; branch: `agent/flutter-prototype-v0`, Draft PR #1.
+- Current implementation: local image OCR → critical-field draft → confirmation
+  → existing Offer persistence → existing notification scheduling/state query.
+- Historical Build 19: 131/131 engineering tests, Actions #99 PASS; Founder FAIL.
+- PX 12 → 7 proposals / 0 direct / 4 review + 9 excluded and native PDF
+  0 direct / 111 review / 229 excluded remain unresolved negative cases.
+- New image flow bypasses full reconstruction; the legacy engine is preserved.
+- Local-first; no cloud requests in new image flow; native PDF route preserved.
+- Local proxy tests: 4/4 PASS; secret boundary PASS. Flutter/Android run in CI.
+- CI validation in progress. No new product acceptance or APK claimed here.
+- Device synthetic smoke test exercises real local OCR/persistence/pending
+  notification. Real coupon accuracy and notification delivery need Founder test.
+- Current approved [spec](../development/SIMPLIFIED_MVP_BUILD20.md),
+  [evidence](../development/BUILD20_EVIDENCE.md), and
+  [Founder test](../development/BUILD20_FOUNDER_TEST.md).
 
-Next: resolve capture/replay capability under the existing diagnostic-only scope;
-see [evidence gap and handoff](../development/BUILD19_DIAGNOSTIC_REVIEW.md).
-
-The current authority is [reduced-scope spec](../development/IMPORT_SCOPE_REDUCTION_SPEC.md).
-Older release notes remain historical evidence, not current product authorization.
+Next authorized task: finish engineering verification and APK, then Founder test.
+Do not resume full reconstruction diagnostics as a prerequisite. No main merge.
+Earlier preflight used a stale local checkout; remote context already existed and
+has now been preserved below. Do not repeat the earlier missing-context claim.
 
 ## Remote context preserved from e1775af (2026-08-23)
 

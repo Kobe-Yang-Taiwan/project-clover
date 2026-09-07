@@ -538,7 +538,7 @@ class _BetaSettingsScreenState extends State<BetaSettingsScreen> {
                           .map(
                             (days) => DropdownMenuItem(
                               value: days,
-                              child: Text('$days 天前'),
+                              child: Text(days == 0 ? '到期當天' : '$days 天前'),
                             ),
                           )
                           .toList(),
@@ -1563,7 +1563,7 @@ class _AddOfferScreenState extends State<AddOfferScreen> {
                     .map(
                       (days) => DropdownMenuItem(
                         value: days,
-                        child: Text('$days 天前'),
+                        child: Text(days == 0 ? '到期當天' : '$days 天前'),
                       ),
                     )
                     .toList(),

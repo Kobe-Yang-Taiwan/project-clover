@@ -131,7 +131,11 @@ void main() {
   }
 
   Future<void> save(WidgetTester tester) async {
-    await tester.ensureVisible(find.byKey(const Key('save-critical-draft')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('save-critical-draft')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.byKey(const Key('save-critical-draft')));
     await tester.pumpAndSettle();
   }
