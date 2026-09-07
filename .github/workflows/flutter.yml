@@ -79,13 +79,16 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: bash -o pipefail -c 'flutter test integration_test/critical_draft_device_test.dart --reporter expanded | tee build/device-smoke.log'
+          script: python3 tool/run_android_capture_smoke.py
 
       - name: Upload device evidence
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: project-clover-build-20-device-evidence
-          path: build/device-smoke.log
+          path: |
+            build/device-smoke.log
+            build/device-alarm.txt
+            build/device-saved.png
           if-no-files-found: ignore
           retention-days: 14

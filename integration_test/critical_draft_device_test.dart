@@ -91,6 +91,8 @@ void main() {
       'captureRecord': records.last,
       'notificationDelivery': 'Founder device confirmation pending',
     })}');
+    // Let the host collect dumpsys alarm and the saved UI before test teardown.
+    await tester.pump(const Duration(seconds: 5));
   });
 }
 
